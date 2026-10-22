@@ -1,0 +1,56 @@
+<vet-step-frame
+  title="En revisión"
+  subtitle="Recibimos tu solicitud. Te avisaremos por correo cuando tengamos una respuesta"
+>
+  <ol class="timeline" aria-label="Avance de tu solicitud">
+    @for (m of milestones(); track m.label) {
+      <li [class]="'milestone milestone--' + m.state" [attr.aria-current]="m.state === 'current' ? 'step' : null">
+        <span class="dot" aria-hidden="true">
+          @if (m.state === 'done') {
+            <mat-icon fontSet="material-icons-outlined">check</mat-icon>
+          } @else if (m.state === 'current') {
+            <span class="dot-core"></span>
+          }
+        </span>
+        <span class="milestone-label">{{ m.label }}</span>
+        <span class="milestone-detail">{{ m.detail }}</span>
+      </li>
+    }
+  </ol>
+
+  @if (error(); as message) {
+    <p class="reg-alert reg-alert--error" role="alert">{{ message }}</p>
+  }
+
+  <section class="meanwhile" aria-labelledby="meanwhile-title">
+    <h2 id="meanwhile-title">Mientras esperas puedes…</h2>
+    <ul>
+      @for (task of tasks; track task.label) {
+        <li>
+          @if (panelReady) {
+            <a [routerLink]="task.link">
+              <mat-icon fontSet="material-icons-outlined" aria-hidden="true">{{ task.icon }}</mat-icon>
+              <span>{{ task.label }}</span>
+              <mat-icon class="chevron" fontSet="material-icons-outlined" aria-hidden="true">chevron_right</mat-icon>
+            </a>
+          } @else {
+            <div class="task-off" aria-disabled="true">
+              <mat-icon fontSet="material-icons-outlined" aria-hidden="true">{{ task.icon }}</mat-icon>
+              <span>{{ task.label }}</span>
+              <small>Pronto</small>
+            </div>
+          }
+        </li>
+      }
+    </ul>
+  </section>
+
+  <p class="limits">Aún no puedes recibir pacientes ni aparecer en el directorio. Se activa al aprobarte.</p>
+
+  <div class="reg-footer" footer>
+    <button type="button" class="vet-btn vet-btn--secondary" (click)="registerAnother()">Registrar otra clínica</button>
+    <button type="button" class="vet-btn vet-btn--primary" [disabled]="!panelReady" title="El panel estará disponible pronto">
+      Ir al panel
+    </button>
+  </div>
+</vet-step-frame>

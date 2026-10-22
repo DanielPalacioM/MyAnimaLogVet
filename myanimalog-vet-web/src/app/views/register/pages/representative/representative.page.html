@@ -1,0 +1,58 @@
+<vet-step-frame
+  [step]="3"
+  label="REPRESENTANTE LEGAL"
+  title="Representante"
+  subtitle="La persona que aparece en el certificado de Cámara de Comercio"
+  [bodyTop]="27"
+>
+  <form id="rep-form" class="reg-stack" [formGroup]="form" (ngSubmit)="next()" novalidate>
+    <vet-field label="¿El representante legal eres tú?" [control]="form.controls.isSelf" [messages]="messages.isSelf">
+      <vet-choice-cards formControlName="isSelf" [options]="options" ariaLabel="¿El representante legal eres tú?" />
+    </vet-field>
+
+    <vet-field label="Nombre completo" for="rep-name" [control]="form.controls.fullName">
+      <input
+        id="rep-name"
+        class="vet-input"
+        type="text"
+        autocomplete="off"
+        placeholder="Como aparece en la cédula"
+        formControlName="fullName"
+        [attr.aria-invalid]="invalid(form.controls.fullName)"
+      />
+    </vet-field>
+
+    <div class="reg-grid">
+      <vet-field label="Tipo de documento" for="rep-type" [control]="form.controls.documentType">
+        <select id="rep-type" class="vet-input" formControlName="documentType">
+          @for (type of documentTypes; track type.value) {
+            <option [value]="type.value">{{ type.label }}</option>
+          }
+        </select>
+      </vet-field>
+
+      <vet-field label="Número de documento" for="rep-number" [control]="form.controls.documentNumber">
+        <input
+          id="rep-number"
+          class="vet-input"
+          type="text"
+          inputmode="numeric"
+          autocomplete="off"
+          placeholder="1234567890"
+          formControlName="documentNumber"
+          [attr.aria-invalid]="invalid(form.controls.documentNumber)"
+        />
+      </vet-field>
+    </div>
+
+    <vet-info-note>
+      Estos datos deben coincidir con la cédula y con el certificado de Cámara de Comercio. Si eres tú, los llenamos con
+      los datos de tu cuenta.
+    </vet-info-note>
+  </form>
+
+  <div class="reg-footer" footer>
+    <button type="button" class="vet-btn vet-btn--secondary" (click)="back()">Atrás</button>
+    <button type="submit" form="rep-form" class="vet-btn vet-btn--primary">Continuar</button>
+  </div>
+</vet-step-frame>

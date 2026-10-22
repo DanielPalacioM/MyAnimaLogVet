@@ -1,0 +1,9 @@
+<vet-auth-shell side="left" [fixed]="true">
+  <vet-login-form
+    [loading]="loading()"
+    [error]="error()"
+    [notice]="notice()"
+    (submitted)="signIn($event)"
+    (forgotPassword)="notice.set('La recuperación de contraseña estará disponible pronto.')"
+  />
+</vet-auth-shell>

@@ -1,0 +1,59 @@
+<form class="login" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+  <h1>Bienvenido a MyAnimaLogVet</h1>
+
+  <div class="fields">
+    <vet-field label="Correo" for="login-email" [large]="true" [control]="form.controls.email" [messages]="emailMessages">
+      <input
+        id="login-email"
+        class="vet-input"
+        type="email"
+        formControlName="email"
+        autocomplete="username"
+        placeholder="Escribe tu correo"
+        [attr.aria-invalid]="form.controls.email.invalid && form.controls.email.touched"
+      />
+    </vet-field>
+
+    <vet-field label="Contraseña" for="login-password" [large]="true" [control]="form.controls.password">
+      <div class="password">
+        <input
+          id="login-password"
+          class="vet-input"
+          [type]="showPassword() ? 'text' : 'password'"
+          formControlName="password"
+          autocomplete="current-password"
+          placeholder="Escribe tu contraseña"
+          [attr.aria-invalid]="form.controls.password.invalid && form.controls.password.touched"
+        />
+        <button
+          type="button"
+          class="toggle"
+          [attr.aria-label]="showPassword() ? 'Ocultar contraseña' : 'Mostrar contraseña'"
+          [attr.aria-pressed]="showPassword()"
+          (click)="showPassword.set(!showPassword())"
+        >
+          <mat-icon fontSet="material-icons-outlined">{{ showPassword() ? 'visibility' : 'visibility_off' }}</mat-icon>
+        </button>
+      </div>
+    </vet-field>
+
+    <button type="button" class="link" (click)="forgotPassword.emit()">¿Olvidaste tu contraseña?</button>
+
+    @if (error(); as message) {
+      <p class="alert alert--error" role="alert">{{ message }}</p>
+    }
+    @if (notice(); as message) {
+      <p class="alert" role="status">{{ message }}</p>
+    }
+
+    <button type="submit" class="vet-btn vet-btn--dark vet-btn--block" [disabled]="loading()">
+      {{ loading() ? 'Entrando…' : 'Iniciar sesión' }}
+    </button>
+  </div>
+
+  <p class="register">
+    ¿Tu clínica aún no está en MyAnimaLogVet?
+    <a routerLink="/registro">Regístrala</a>
+  </p>
+  <p class="footnote">Conectado con MyAnimaLog para un cuidado sin fricciones.</p>
+</form>

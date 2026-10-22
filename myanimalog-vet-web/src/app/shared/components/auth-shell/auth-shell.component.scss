@@ -1,0 +1,210 @@
+:host {
+  display: block;
+}
+
+.shell {
+  // El componente calcula --k (alto de la ventana / 832, formulario) y --ka (max(alto / 832, ancho / 1280), arte).
+  // 1 px de diseño del arte = --s; 1 px de diseño del formulario = --sf.
+  --s: calc(var(--k, 1) * 1px);
+  --sf: calc(var(--k, 1) * 1px);
+
+  position: relative;
+  // La pantalla no se desplaza: solo lo hace el contenido de la columna blanca (`.content`), como una página normal.
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+.shell--right {
+  background: linear-gradient(131.77deg, #fff 51.57%, #999 75.51%) fixed;
+  --wave-w: max(calc(985 * var(--s)), 77vw);
+  --box-w: calc(985 * var(--s));
+  // Formulario de 381 px (x = 45…426 en el Figma), centrado en el área blanca que deja la mancha.
+  --form-w: 381px;
+  --form-left: calc((100% - var(--wave-w) + 243 * var(--s)) / 2 - 190.5 * 1.32 * var(--sf));
+}
+
+.shell--left {
+  background: linear-gradient(226.42deg, #fff 47.09%, #999 68.61%) fixed;
+  --wave-w: max(calc(924.096 * var(--s)), 72vw);
+  --box-w: calc(924.096 * var(--s));
+  // Formulario de 403 px (x = 845…1248 en el Figma), centrado en el área blanca que deja la mancha.
+  --form-w: 403px;
+  --form-left: calc((100% + 0.816 * var(--wave-w) - 40 * var(--s)) / 2 - 172 * 1.32 * var(--sf));
+}
+
+// La columna de marca queda fija: el morado siempre llena la pantalla aunque el formulario se desplace.
+.art {
+  position: fixed;
+  width: var(--wave-w);
+  pointer-events: none;
+  user-select: none;
+
+  &--right { right: calc(-110 * var(--s)); }
+  &--left { left: calc(-40 * var(--s)); }
+}
+
+.wave {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+
+  &--flip { transform: scaleX(-1); }
+}
+
+// Las escenas miden lo que el Figma y quedan pegadas al borde exterior; la mancha se estira solo en horizontal.
+.art--left .scene { left: 0; }
+.art--right .scene { right: 0; }
+// Centro de la zona morada visible, medido desde el borde exterior.
+.art--left { --zc: calc(0.38 * var(--wave-w)); }
+.art--right { --zc: calc(0.45 * var(--wave-w) - 110 * var(--s)); }
+
+// ---- Escenas: salen y entran una a la vez ----
+
+.scene {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: var(--box-w);
+  opacity: 0;
+  z-index: 0;
+  // Sale primero (45 % del tiempo)...
+  transition: opacity calc(var(--fade, 2400ms) * 0.45) ease-in-out 0s;
+
+  // ...y solo después entra la siguiente: nunca se ven dos diseños a la vez.
+  &--active {
+    opacity: 1;
+    z-index: 1;
+    transition: opacity calc(var(--fade, 2400ms) * 0.55) ease-in-out calc(var(--fade, 2400ms) * 0.45);
+  }
+}
+
+.blob {
+  position: absolute;
+  overflow: visible;
+}
+.blob-fill { position: absolute; inset: 0; width: 100%; height: 100%; }
+.blob-inner { position: absolute; left: 50%; top: 50%; max-width: none; }
+
+.logo {
+  position: absolute;
+  margin: 0;
+  transform: translateX(-50%);
+  &.logo--r { transform: translateX(50%); }
+  font-family: 'Jua', 'Afacad', sans-serif;
+  font-weight: 400;
+  line-height: 1.3;
+  color: #fff;
+  white-space: pre;
+  text-shadow: 0 0.05em 0.05em rgb(0 0 0 / 25%);
+}
+
+.phrase {
+  position: absolute;
+  width: calc(560 * var(--s));
+  margin: 0;
+  transform: translateX(-50%);
+  text-align: center;
+  font: 700 1em/1.2 'Afacad', sans-serif;
+  color: #fff;
+  text-wrap: balance;
+  text-shadow: 0 2px 6px rgb(0 0 0 / 25%);
+
+  &.logo--r { transform: translateX(50%); }
+}
+
+.logo-text { display: inline-block; }
+
+// Imagotipo: el perrito de la marca sobre el nombre (Figma), en la parte izquierda del nombre.
+.mascot {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  top: -3.7em;
+  width: 3.4em;
+  height: auto;
+}
+.logo-et { color: var(--vet-verified); letter-spacing: -0.05em; }
+
+// Estetoscopio (la V de "Vet"): 143 px sobre un texto de 80 px = 1,79 em; a 4,625 em del inicio del texto.
+.stethoscope {
+  position: absolute;
+  top: 0.3em;
+  left: 4.625em;
+  width: 1.79em;
+  height: 1.79em;
+  object-fit: cover;
+}
+
+// El eslogan mide 20 px sobre un logo de 80 px = 0,25 em.
+.tagline {
+  position: absolute;
+  margin: 0;
+  color: #fff;
+  font-family: 'Afacad', sans-serif;
+  font-size: 0.25em;
+  line-height: 1.2;
+  white-space: nowrap;
+
+  // Como en el Figma: 96 px bajo el inicio del logo, a su izquierda.
+  &--figma { top: 4.8em; left: 0; }
+  // Centrado bajo todo el logo.
+  &--below { top: 9.6em; left: 0; right: 0; text-align: center; }
+}
+
+.photo {
+  position: absolute;
+  object-fit: cover;
+}
+
+// Al entrar, la foto se asienta con un acercamiento suave.
+.scene--active .photo {
+  animation: settle 6s ease-out both;
+}
+
+@keyframes settle {
+  from { transform: scale(1.04); }
+  to { transform: scale(1); }
+}
+
+// ---- Columna blanca ----
+
+.content {
+  // Cubre toda la pantalla (la rueda funciona en cualquier punto) y desplaza el contenido como una página normal.
+  // El morado queda quieto y la barra de scroll no se muestra.
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  padding-left: max(0px, var(--form-left));
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: none;
+
+  &.content--fixed { overflow-y: hidden; }
+
+  &::-webkit-scrollbar { display: none; }
+}
+
+// El formulario se dibuja en px del diseño y `zoom` lo escala con el mismo factor que el arte.
+.stage {
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+  width: var(--form-w);
+  zoom: calc(var(--k, 1) * 1.32);
+}
+
+// En ventanas angostas el arte no cabe: queda solo el formulario.
+@media (max-width: 1100px) {
+  .art { display: none; }
+  .shell { background: #fff; }
+  .content { padding-left: 0; align-items: center; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scene--active .photo { animation: none; }
+}

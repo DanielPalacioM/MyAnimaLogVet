@@ -1,0 +1,178 @@
+// Controles de formulario de las pantallas de acceso y registro (DISENO §6: Vet/Campo, Vet/Botón).
+// Campo: caja de 41 px, borde negro de 2 px, radio 5. Botón: 41 px de alto, Afacad Bold 15.
+
+.vet-input {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  height: 41px;
+  padding: 0 9px;
+  border: 2px solid #000;
+  border-radius: 5px;
+  background: #fff;
+  color: var(--vet-text);
+  font: 700 14px/1 'Afacad', system-ui, sans-serif;
+
+  &::placeholder {
+    color: #777575;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--vet-primary);
+    outline-offset: 1px;
+  }
+
+  &[aria-invalid='true'] {
+    border-color: var(--vet-danger);
+  }
+
+  &:disabled {
+    background: #f3f3f6;
+    color: #6b6b80;
+  }
+}
+
+select.vet-input {
+  appearance: none;
+  padding-right: 32px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+}
+
+.vet-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-sizing: border-box;
+  height: 41px;
+  padding: 0 16px;
+  border: 2px solid transparent;
+  border-radius: 5px;
+  font: 700 15px/1 'Afacad', system-ui, sans-serif;
+  cursor: pointer;
+  text-decoration: none;
+  transition: filter 0.15s ease;
+
+  &:hover:not(:disabled) {
+    filter: brightness(1.08);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--vet-primary);
+    outline-offset: 2px;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+
+  &--primary {
+    background: var(--vet-primary);
+    color: #fff;
+  }
+
+  &--secondary {
+    background: #fff;
+    border-color: #000;
+    color: #000;
+  }
+
+  &--block {
+    width: 100%;
+  }
+}
+
+.vet-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.vet-btn--dark {
+  background: #000;
+  color: #fff;
+  font-size: 12px; // Figma: "Sign in" 12 px
+}
+
+// ---- Diseño común de los pasos del registro ----
+
+.reg-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 13px;
+  row-gap: 10px;
+
+  > .full {
+    grid-column: 1 / -1;
+  }
+}
+
+.reg-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.reg-footer {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 13px;
+
+  > .vet-btn:only-child {
+    grid-column: 1 / -1;
+  }
+}
+
+.reg-alert {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 5px;
+  background: var(--vet-soft);
+  font: 500 12px/1.35 'Afacad', sans-serif;
+  color: var(--vet-text);
+
+  &--error {
+    background: #fef3f2;
+    color: var(--vet-danger);
+    font-weight: 700;
+  }
+
+  a {
+    color: var(--vet-primary);
+    font-weight: 700;
+  }
+}
+
+.reg-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font: 500 13px/1.35 'Afacad', sans-serif;
+  color: #000;
+  cursor: pointer;
+
+  input {
+    flex: none;
+    width: 18px;
+    height: 18px;
+    margin: 1px 0 0;
+    accent-color: var(--vet-primary);
+  }
+}
+
+// La página que se muestra dentro del marco de acceso ocupa al menos todo el alto de la pantalla; así los botones
+// quedan abajo (y = 700 en el diseño) y, si hay más contenido, la columna se desplaza como una página normal.
+vet-auth-shell .stage > :not(router-outlet) {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+  width: 100%;
+}

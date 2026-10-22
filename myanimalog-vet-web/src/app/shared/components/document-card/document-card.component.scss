@@ -1,0 +1,77 @@
+:host { display: block; }
+
+.card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-sizing: border-box;
+  min-height: 56px;
+  padding: 8px 10px;
+  border: 2px solid #000;
+  border-radius: 5px;
+  background: #fff;
+}
+
+.card--correct {
+  border-color: var(--vet-warn);
+  background: #fff7ea;
+}
+
+.icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 5px;
+  background: var(--vet-soft);
+  color: var(--vet-primary);
+}
+.icon--ready { background: var(--vet-teal-soft); color: var(--vet-teal); }
+.icon mat-icon { width: 16px; height: 16px; font-size: 16px; }
+
+.text { flex: 1; min-width: 0; }
+.title { margin: 0; font: 700 13px/1.2 'Afacad', sans-serif; color: #000; }
+.hint {
+  margin: 2px 0 0;
+  overflow: hidden;
+  font: 500 10px/1.3 'Afacad', sans-serif;
+  color: var(--vet-text-2);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chip {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--vet-teal-soft);
+  color: var(--vet-teal);
+  font: 700 10px/1 'Afacad', sans-serif;
+}
+.chip mat-icon { width: 12px; height: 12px; font-size: 12px; }
+
+.action {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border: 1.5px solid var(--vet-primary);
+  border-radius: 5px;
+  background: #fff;
+  color: var(--vet-primary);
+  font: 700 10px/1 'Afacad', sans-serif;
+  cursor: pointer;
+}
+.action mat-icon { width: 12px; height: 12px; font-size: 12px; }
+.action--correct { border-color: var(--vet-warn); background: var(--vet-warn); color: #1a1a2e; }
+.action:focus-visible { outline: 2px solid var(--vet-primary); outline-offset: 2px; }
+// Con el chip "Listo" el botón de reemplazo pasa a ser secundario: texto sin borde.
+.chip + .action { border-color: transparent; }
+.action--icon { padding: 4px; }
+
+.error { margin: 4px 2px 0; font: 700 12px/1.3 'Afacad', sans-serif; color: var(--vet-danger); }

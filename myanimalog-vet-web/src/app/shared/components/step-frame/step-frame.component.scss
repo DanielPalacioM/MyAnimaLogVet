@@ -1,0 +1,89 @@
+:host {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+}
+
+.frame {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  box-sizing: border-box;
+  // Botones a y = 700 en el lienzo de 832 px: 91 px de aire debajo.
+  padding: 34px 0 91px;
+}
+
+.eyebrow {
+  margin: 0;
+  text-align: center;
+  white-space: pre;
+  font: 700 12px/16px 'Afacad', sans-serif;
+  letter-spacing: 0.08em;
+  color: var(--vet-primary);
+}
+
+.bar {
+  height: 4px;
+  margin-top: 6px;
+  border-radius: 2px;
+  background: #e3e1f6;
+  overflow: hidden;
+
+  span {
+    display: block;
+    height: 100%;
+    border-radius: 2px;
+    background: var(--vet-primary);
+    transition: width 0.3s ease;
+  }
+}
+
+h1 {
+  margin: 28px 0 0;
+  text-align: center;
+  font-weight: 700;
+  line-height: 1;
+  color: #000;
+
+  &:focus {
+    outline: none;
+  }
+}
+
+.subtitle {
+  width: 320px;
+  max-width: 100%;
+  min-height: 38px;
+  margin: 20px auto 0;
+  text-align: center;
+  font: 500 15px/19px 'Afacad', sans-serif;
+  color: var(--vet-text-2);
+}
+
+.subtitle--left {
+  width: auto;
+  text-align: left;
+}
+
+.body {
+  margin-top: 34px;
+}
+
+.footer {
+  margin-top: auto;
+  padding-top: 24px;
+}
+
+.frame--plain h1 { margin-top: 56px; } // sin indicador de paso (estado, verificación): título a y ≈ 118 como en el Figma
+
+.frame--tall {
+  h1 { margin-top: 86px; }
+  .subtitle { margin-top: 32px; }
+  .body { margin-top: 95px; }
+  padding-bottom: 79px;
+  .footer { padding-top: 5px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bar span { transition: none; }
+}

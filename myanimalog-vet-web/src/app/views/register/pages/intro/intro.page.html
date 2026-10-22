@@ -1,0 +1,84 @@
+<vet-step-frame title="Antes de empezar" [titleSize]="48" subtitle="Así cuidamos la información de tu clínica" [subtitleLeft]="true">
+  <form id="intro-form" class="intro" [formGroup]="form" (ngSubmit)="start()" novalidate>
+    <div class="terms" tabindex="0" role="region" aria-label="Aviso de tratamiento de datos (usa las flechas para desplazarte)">
+    <p>
+      Para verificar tu clínica te vamos a pedir datos y documentos legales. Antes de seguir, queremos que sepas qué
+      hacemos con ellos.
+    </p>
+
+    <section>
+      <h2>Qué te pediremos</h2>
+      <ul>
+        <li>Datos de la clínica: nombre, razón social, NIT, dirección y contacto.</li>
+        <li>Documentos: RUT, certificado de Cámara de Comercio y cédula del representante legal.</li>
+        <li>Si eres veterinario: tu tarjeta profesional y tu cédula.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Para qué los usamos</h2>
+      <ul>
+        <li>Solo para confirmar que tu clínica y tus profesionales están habilitados para ejercer.</li>
+        <li>
+          Los datos públicos de tu clínica (nombre, dirección, teléfono y logo) aparecerán en el directorio de
+          MyAnimaLog cuando tu clínica esté aprobada. Tu NIT y tus documentos nunca se publican.
+        </li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Cómo los revisamos</h2>
+      <ol type="a">
+        <li>
+          Primero, un análisis automático con inteligencia artificial comprueba que los documentos sean legibles y que
+          los datos coincidan entre sí. La IA no aprueba ni rechaza a nadie, no guarda tus documentos y no los usa para
+          entrenarse.
+        </li>
+        <li>
+          Después, una persona de nuestro equipo revisa tus documentos y confirma la tarjeta profesional en el registro
+          oficial del COMVEZCOL. Solo esa persona decide.
+        </li>
+      </ol>
+    </section>
+
+    <section>
+      <h2>Cómo los protegemos</h2>
+      <ul>
+        <li>
+          Tus documentos se guardan cifrados en un almacenamiento privado. Solo el equipo de verificación puede verlos,
+          con accesos temporales.
+        </li>
+        <li>Si tu solicitud es rechazada, borramos los documentos a los 90 días.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Tus derechos</h2>
+      <p>
+        Puedes conocer, actualizar, corregir o pedir que eliminemos tus datos cuando quieras, escribiendo a
+        MyAnimaLog&#64;gmail.com. Tratamos tu información según la Ley 1581 de 2012 de protección de datos personales.
+      </p>
+    </section>
+
+    </div>
+
+    <fieldset class="consents">
+      <legend class="vet-sr-only">Aceptaciones obligatorias</legend>
+      <label class="reg-check">
+        <input type="checkbox" formControlName="dataPolicy" [attr.aria-invalid]="attempted() && form.controls.dataPolicy.invalid" />
+        He leído y acepto la Política de tratamiento de datos, incluido el análisis automático de mis documentos con IA.
+      </label>
+      <label class="reg-check">
+        <input type="checkbox" formControlName="terms" [attr.aria-invalid]="attempted() && form.controls.terms.invalid" />
+        Acepto los Términos y condiciones de MyAnimaLogVet.
+      </label>
+      @if (attempted() && form.invalid) {
+        <p class="reg-alert reg-alert--error" role="alert">Para continuar debes aceptar las dos casillas.</p>
+      }
+    </fieldset>
+  </form>
+
+  <div class="reg-footer" footer>
+    <button type="submit" form="intro-form" class="vet-btn vet-btn--primary">Empezar registro</button>
+  </div>
+</vet-step-frame>

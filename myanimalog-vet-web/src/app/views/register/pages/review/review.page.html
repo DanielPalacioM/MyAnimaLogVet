@@ -1,0 +1,46 @@
+<vet-step-frame
+  [step]="6"
+  label="REVISAR Y ENVIAR"
+  title="Revisa y envía"
+  subtitle="Confirma que todo esté bien antes de enviar tu solicitud"
+  [bodyTop]="22"
+>
+  <div class="reg-stack">
+    <ul class="summary">
+      @for (block of blocks(); track block.step) {
+        <li>
+          <div>
+            <p class="summary-title">{{ block.title }}</p>
+            <p class="summary-detail">{{ block.detail }}</p>
+          </div>
+          <button type="button" class="edit" [attr.aria-label]="'Editar ' + block.title" (click)="edit(block.step)">
+            Editar
+          </button>
+        </li>
+      }
+    </ul>
+
+    <label class="reg-check">
+      <input type="checkbox" [formControl]="declaration" [attr.aria-invalid]="attempted() && declaration.invalid" />
+      Declaro que la información y los documentos que envío son verídicos.
+    </label>
+    @if (attempted() && declaration.invalid) {
+      <p class="reg-alert reg-alert--error" role="alert">Debes aceptar la declaración para enviar.</p>
+    }
+
+    <vet-info-note icon="schedule">
+      Respondemos en 24 a 48 horas. Mientras tanto podrás configurar tu clínica e invitar a tu equipo.
+    </vet-info-note>
+
+    @if (error(); as message) {
+      <p class="reg-alert reg-alert--error" role="alert">{{ message }}</p>
+    }
+  </div>
+
+  <div class="reg-footer" footer>
+    <button type="button" class="vet-btn vet-btn--secondary" [disabled]="sending()" (click)="back()">Atrás</button>
+    <button type="button" class="vet-btn vet-btn--primary" [disabled]="sending()" (click)="send()">
+      {{ sending() ? 'Enviando…' : 'Enviar a verificación' }}
+    </button>
+  </div>
+</vet-step-frame>

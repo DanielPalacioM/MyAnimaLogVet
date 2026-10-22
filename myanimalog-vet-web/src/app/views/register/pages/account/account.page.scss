@@ -1,0 +1,61 @@
+.form { width: 263px; margin: 0 auto; gap: 2px; }
+
+.submit { margin-top: 23px; }
+
+.password { position: relative; }
+.password .vet-input { padding-right: 40px; }
+
+.toggle {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #000;
+  transform: translateY(-50%);
+  cursor: pointer;
+}
+.toggle mat-icon { width: 18px; height: 18px; font-size: 18px; }
+.toggle:focus-visible { outline: 2px solid var(--vet-primary); border-radius: 4px; }
+
+.footer { text-align: center; }
+
+.login-link {
+  height: 24px;
+  margin: 0;
+  font: 500 13px/24px 'Afacad', sans-serif;
+  color: var(--vet-text-2);
+}
+.login-link a { color: var(--vet-primary); font-weight: 700; }
+
+.social-title { height: 20px; margin: 0 0 18px; font: 500 12px/20px 'Afacad', sans-serif; color: #000; }
+
+.social {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.social li {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  box-sizing: border-box;
+  width: 90px;
+  height: 25px;
+  padding: 0 0 0 10px;
+  border: 2px solid #000;
+  border-radius: 5px;
+  background: #fff;
+  font: 700 10px/1 'Afacad', sans-serif;
+}
+
+// Línea de 307 px bajo los botones de redes (Figma 1902:206).
+.social-line { width: 307px; margin: 12px auto 0; border: 0; border-top: 2px solid #000; }

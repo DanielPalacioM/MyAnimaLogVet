@@ -1,0 +1,33 @@
+<vet-step-frame title="Verifica tu correo" [titleSize]="32">
+  <form class="verify" (submit)="$event.preventDefault(); verify()" novalidate>
+    <p class="lead">
+      Para registrar una clínica tu correo tiene que estar verificado. Te enviamos un código de {{ codeLength }} dígitos a
+      <strong>{{ email }}</strong>.
+    </p>
+
+    <vet-otp-input [(value)]="code" [length]="codeLength" [invalid]="!!error()" />
+
+    @if (error(); as message) {
+      <p class="reg-alert reg-alert--error" role="alert">{{ message }}</p>
+    }
+    @if (notice(); as message) {
+      <p class="reg-alert" role="status">{{ message }}</p>
+    }
+
+    <button type="submit" class="vet-btn vet-btn--primary vet-btn--block" [disabled]="loading()">
+      {{ loading() ? 'Verificando…' : 'Verificar y continuar' }}
+    </button>
+
+    <p class="resend">
+      ¿No te llegó?
+      <button type="button" class="link" [disabled]="!canResend()" (click)="resend()">
+        Reenviar código@if (!canResend()) { (en {{ secondsLeft() }} s) }
+      </button>
+    </p>
+
+    <vet-info-note icon="mail_outline">
+      Lo pedimos porque la clínica va a manejar datos de clientes y documentos legales: el correo es cómo te avisamos de la
+      verificación.
+    </vet-info-note>
+  </form>
+</vet-step-frame>

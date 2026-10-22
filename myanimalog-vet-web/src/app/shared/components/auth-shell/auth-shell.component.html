@@ -1,0 +1,93 @@
+<div class="shell" [class.shell--left]="side() === 'left'" [class.shell--right]="side() === 'right'">
+  <div
+    class="art"
+    [class.art--left]="side() === 'left'"
+    [class.art--right]="side() === 'right'"
+    [style.height]="u(box().h)"
+    [style.top]="u(box().top)"
+    [style.--fade]="fadeMs + 'ms'"
+    role="img"
+    aria-label="MyAnimaLogVet"
+  >
+    <img class="wave" [class.wave--flip]="side() === 'right'" [src]="box().wave" alt="" />
+
+    @for (scene of scenes(); track scene.id; let i = $index) {
+      <div class="scene" [class.scene--active]="i === active()" [attr.data-scene]="scene.id">
+        @for (blob of scene.blobs; track $index) {
+          @if (blob.src) {
+            <div class="blob" [style.left]="u(blob.x)" [style.top]="u(blob.y)" [style.width]="u(blob.w)" [style.height]="u(blob.h)">
+              @if (blob.inner; as inner) {
+                <img
+                  class="blob-inner"
+                  [src]="blob.src"
+                  alt=""
+                  [style.width]="u(inner.w)"
+                  [style.height]="u(inner.h)"
+                  [style.transform]="'translate(-50%, -50%) rotate(' + inner.rotate + 'deg) skewX(' + inner.skew + 'deg)'"
+                />
+              } @else {
+                <img class="blob-fill" [src]="blob.src" alt="" />
+              }
+            </div>
+          } @else {
+            <svg
+              class="blob"
+              viewBox="0 0 100 100"
+              preserveAspectRatio="none"
+              [style.left]="u(blob.x)"
+              [style.top]="u(blob.y)"
+              [style.width]="u(blob.w)"
+              [style.height]="u(blob.h)"
+              [style.transform]="'rotate(' + (blob.rotate ?? 0) + 'deg)'"
+            >
+              <path [attr.d]="blobPaths[blob.shape ?? 0]" [attr.fill]="blobColor" />
+            </svg>
+          }
+        }
+
+        @if (scene.logo; as logo) {
+        <div class="logo" [style.left]="side() === 'left' ? 'var(--zc)' : null" [style.right]="side() === 'right' ? 'var(--zc)' : null" [class.logo--r]="side() === 'right'" [style.top]="logoTop(logo.y)" [style.font-size]="v(logo.size)">
+          @if (logo.mascot) {
+            <img class="mascot" src="/brand/icon-myanimalog.png" alt="" />
+          }
+          <span class="logo-text">MyAnimaLog&nbsp;&nbsp;&nbsp;<span class="logo-et">et</span></span>
+          <img class="stethoscope" src="/brand/estetoscopio.png" alt="" />
+          @if (scene.tagline; as mode) {
+            <p class="tagline" [class.tagline--figma]="mode === 'figma'" [class.tagline--below]="mode === 'below'">{{ tagline }}</p>
+          }
+        </div>
+        }
+        @if (scene.phrase; as phrase) {
+          <p
+            class="phrase"
+            [class.logo--r]="side() === 'right'"
+            [style.left]="side() === 'left' ? 'var(--zc)' : null"
+            [style.right]="side() === 'right' ? 'var(--zc)' : null"
+            [style.top]="logoTop(phrase.y)"
+            [style.font-size]="v(phrase.size)"
+          >{{ phrase.text }}</p>
+        }
+
+        @if (scene.photo; as photo) {
+          <img
+            class="photo"
+            [src]="photo.src"
+            alt=""
+            [style.left]="side() === 'left' ? v(photo.x) : null"
+            [style.right]="side() === 'right' ? photoRight(photo) : null"
+            [style.top]="photoTop(photo)"
+            [style.width]="v(photo.w)"
+            [style.height]="v(photo.h)"
+            [style.scale]="photo.flip ? '-1 1' : null"
+          />
+        }
+      </div>
+    }
+  </div>
+
+  <main class="content" [class.content--fixed]="fixed()">
+    <div class="stage">
+      <ng-content />
+    </div>
+  </main>
+</div>

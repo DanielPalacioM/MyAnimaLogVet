@@ -1,0 +1,104 @@
+<vet-step-frame
+  [step]="2"
+  label="DATOS DE LA CLÍNICA"
+  title="Tu clínica"
+  subtitle="Solo el veterinario líder puede completar esta parte"
+>
+  <form id="clinic-form" class="reg-grid" [formGroup]="form" (ngSubmit)="next()" novalidate>
+    <vet-field label="Nombre comercial" for="cl-name" [control]="form.controls.name" [messages]="messages.name">
+      <input id="cl-name" class="vet-input" type="text" formControlName="name" autocomplete="organization" [attr.aria-invalid]="invalid(form.controls.name)" />
+    </vet-field>
+
+    <vet-field label="Razón social" for="cl-legal" [control]="form.controls.legalName" [messages]="messages.name">
+      <input id="cl-legal" class="vet-input" type="text" formControlName="legalName" [attr.aria-invalid]="invalid(form.controls.legalName)" />
+    </vet-field>
+
+    <vet-field label="NIT" for="cl-nit" [control]="form.controls.nit" hint="Sin puntos ni guion">
+      <input id="cl-nit" class="vet-input" type="text" inputmode="numeric" placeholder="900123456" formControlName="nit" [attr.aria-invalid]="invalid(form.controls.nit)" />
+    </vet-field>
+
+    <vet-field label="DV (dígito de verificación)" for="cl-dv" [control]="form.controls.nitDv" hint="El número después del guion">
+      <input id="cl-dv" class="vet-input" type="text" inputmode="numeric" maxlength="1" placeholder="8" formControlName="nitDv" [attr.aria-invalid]="invalid(form.controls.nitDv)" />
+    </vet-field>
+
+    <vet-field label="Teléfono de la clínica" for="cl-phone" [control]="form.controls.phone">
+      <div class="prefixed">
+        <span class="prefix" aria-hidden="true">+57</span>
+        <input id="cl-phone" class="vet-input" type="tel" inputmode="numeric" autocomplete="tel-national" formControlName="phone" [attr.aria-invalid]="invalid(form.controls.phone)" />
+      </div>
+    </vet-field>
+
+    <vet-field label="Correo de la clínica" for="cl-email" [control]="form.controls.email" [messages]="messages.email">
+      <input id="cl-email" class="vet-input" type="email" autocomplete="email" formControlName="email" [attr.aria-invalid]="invalid(form.controls.email)" />
+    </vet-field>
+
+    <vet-field label="Departamento / ciudad" for="cl-location" [control]="form.controls.location" [messages]="messages.location">
+      <select id="cl-location" class="vet-input" formControlName="location" [attr.aria-invalid]="invalid(form.controls.location)">
+        <option value="" disabled>Selecciona</option>
+        @for (department of departments; track department.name) {
+          <optgroup [label]="department.name">
+            @for (city of department.cities; track city) {
+              <option [value]="department.name + '|' + city">{{ city }}</option>
+            }
+          </optgroup>
+        }
+      </select>
+    </vet-field>
+
+    <vet-field label="Subir logo" for="cl-logo" [optional]="true">
+      <div class="logo">
+        <input #logoInput class="vet-sr-only" type="file" tabindex="-1" accept=".png,.jpg,.jpeg,.webp" (change)="pickLogo($event)" />
+        <button id="cl-logo" type="button" class="vet-input logo-btn" (click)="logoInput.click()">
+          @if (logoPreview(); as src) {
+            <img [src]="src" alt="" width="25" height="25" />
+            <span class="logo-name">{{ logo()?.name }}</span>
+          } @else {
+            <mat-icon fontSet="material-icons-outlined" aria-hidden="true">upload</mat-icon>
+            <span>PNG, JPG o WEBP</span>
+          }
+        </button>
+        @if (logo()) {
+          <button type="button" class="logo-remove" aria-label="Quitar logo" (click)="removeLogo()">
+            <mat-icon fontSet="material-icons-outlined">close</mat-icon>
+          </button>
+        }
+      </div>
+      @if (logoError(); as message) {
+        <p class="field-error" role="alert">{{ message }}</p>
+      }
+    </vet-field>
+
+    <vet-field label="Dirección" for="cl-address" [control]="form.controls.address">
+      <input id="cl-address" class="vet-input" type="text" autocomplete="street-address" formControlName="address" [attr.aria-invalid]="invalid(form.controls.address)" />
+    </vet-field>
+
+    <div class="map" role="group" aria-label="Ubicación en el mapa">
+      <div class="map-overlay">
+        @if (coords(); as c) {
+          <p class="map-saved"><mat-icon fontSet="material-icons-outlined" aria-hidden="true">place</mat-icon>Ubicación guardada</p>
+          <p class="map-coords">{{ c.lat }}, {{ c.lng }}</p>
+          <button type="button" class="map-btn" (click)="clearLocation()">Quitar</button>
+        } @else {
+          <button type="button" class="map-btn" [disabled]="locating()" (click)="useMyLocation()">
+            <mat-icon fontSet="material-icons-outlined" aria-hidden="true">my_location</mat-icon>
+            {{ locating() ? 'Buscando…' : 'Usar mi ubicación' }}
+          </button>
+        }
+      </div>
+    </div>
+    @if (locationError(); as message) {
+      <p class="field-error full" role="alert">{{ message }}</p>
+    }
+
+    @if (error(); as message) {
+      <p class="reg-alert reg-alert--error full" role="alert">{{ message }}</p>
+    }
+  </form>
+
+  <div class="reg-footer" footer>
+    <button type="button" class="vet-btn vet-btn--secondary" (click)="back()">Atrás</button>
+    <button type="submit" form="clinic-form" class="vet-btn vet-btn--primary" [disabled]="checking()">
+      {{ checking() ? 'Validando…' : 'Continuar' }}
+    </button>
+  </div>
+</vet-step-frame>

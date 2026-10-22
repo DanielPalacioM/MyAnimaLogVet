@@ -1,0 +1,7 @@
+// Posiciones del Figma 1910:131: tarjetas en y = 259, profesión 341, especialidad 415 y documentos 470 / 534.
+.reg-stack { gap: 0; }
+.reg-stack > :nth-child(2) { margin-top: 19px; }
+.reg-stack > :nth-child(3) { margin-top: 11px; }
+.reg-stack > vet-document-card { margin-top: 8px; }
+.reg-stack > .reg-grid + vet-document-card { margin-top: 14px; }
+.reg-stack > vet-info-note { margin-top: 14px; }

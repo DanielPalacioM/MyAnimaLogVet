@@ -1,0 +1,39 @@
+@use '@angular/material' as mat;
+@use './styles/forms';
+
+// Tokens de marca (docs/MYANIMALOG_VET_DISENO.md §2)
+:root {
+  --vet-primary: #4037be;
+  --vet-primary-light: #544cc4;
+  --vet-indigo: #201b61;
+  --vet-soft: #f1f0fb;
+  --vet-soft-2: #f7f6ff;
+  --vet-verified: #00ffdf; // solo sello de "verificada"
+  --vet-teal: #00796b;
+  --vet-teal-soft: #e0fffa;
+  --vet-warn: #f5a623;
+  --vet-text: #1a1a2e;
+  --vet-text-2: #404040;
+  --vet-danger: #b42318;
+}
+
+html {
+  @include mat.theme((
+    color: mat.$violet-palette,
+    typography: Afacad,
+    density: 0,
+  ));
+  --mat-sys-primary: var(--vet-primary);
+  --mat-sys-surface: #ffffff;
+  --mat-sys-background: var(--vet-soft-2);
+  --mat-sys-error: var(--vet-danger);
+}
+
+html, body { height: 100%; }
+
+body {
+  margin: 0;
+  font-family: 'Afacad', system-ui, sans-serif;
+  color: var(--vet-text);
+  background: var(--vet-soft-2);
+}

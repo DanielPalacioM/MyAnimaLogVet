@@ -1,0 +1,87 @@
+<vet-step-frame
+  [step]="5"
+  label="PERFIL PROFESIONAL"
+  title="Tu perfil"
+  subtitle="Tu tarjeta profesional se verifica una sola vez, aunque trabajes en varias clínicas"
+  [bodyTop]="27"
+>
+  <form id="profile-form" class="reg-stack" [formGroup]="form" (ngSubmit)="next()" novalidate>
+    <vet-field label="¿Eres médico veterinario?" [control]="form.controls.isVeterinarian" [messages]="messages.isVeterinarian">
+      <vet-choice-cards formControlName="isVeterinarian" [options]="options" ariaLabel="¿Eres médico veterinario?" />
+    </vet-field>
+
+    @if (isVeterinarian() === 'yes') {
+      <div class="reg-grid">
+        <vet-field label="Profesión" for="pf-profession" [control]="form.controls.profession" [messages]="messages.profession">
+          <select id="pf-profession" class="vet-input" formControlName="profession" [attr.aria-invalid]="invalid(form.controls.profession)">
+            <option value="" disabled>MV o MVZ</option>
+            @for (p of professions; track p.value) {
+              <option [value]="p.value">{{ p.label }}</option>
+            }
+          </select>
+        </vet-field>
+
+        <vet-field label="Tarjeta profesional" for="pf-license" [control]="form.controls.licenseNumber">
+          <input id="pf-license" class="vet-input" type="text" autocomplete="off" placeholder="Número de tarjeta" formControlName="licenseNumber" [attr.aria-invalid]="invalid(form.controls.licenseNumber)" />
+        </vet-field>
+
+        <vet-field label="Especialidad" for="pf-specialty" [optional]="true" [control]="form.controls.specialty">
+          <input id="pf-specialty" class="vet-input" type="text" placeholder="Ej. cirugía, felinos" formControlName="specialty" />
+        </vet-field>
+
+        <vet-field label="Universidad" for="pf-university" [optional]="true" [control]="form.controls.university">
+          <input id="pf-university" class="vet-input" type="text" placeholder="Dónde te graduaste" formControlName="university" />
+        </vet-field>
+      </div>
+
+      <vet-document-card
+        [title]="specs.PROFESSIONAL_CARD.title"
+        [hint]="specs.PROFESSIONAL_CARD.hint"
+        [state]="state('PROFESSIONAL_CARD')"
+        [fileName]="documents().PROFESSIONAL_CARD?.name ?? null"
+        [fileSize]="documents().PROFESSIONAL_CARD?.size ?? null"
+        (picked)="pick('PROFESSIONAL_CARD', $event)"
+      />
+
+      @if (idCovered()) {
+        <vet-document-card
+          [title]="specs.ID_DOCUMENT.title"
+          hint="Ya la subiste en el paso anterior"
+          state="ready"
+          [locked]="true"
+        />
+      } @else {
+        <vet-document-card
+          [title]="specs.ID_DOCUMENT.title"
+          [hint]="specs.ID_DOCUMENT.hint"
+          [state]="state('ID_DOCUMENT')"
+          [fileName]="documents().ID_DOCUMENT?.name ?? null"
+          [fileSize]="documents().ID_DOCUMENT?.size ?? null"
+          (picked)="pick('ID_DOCUMENT', $event)"
+        />
+      }
+
+      <vet-document-card
+        [title]="specs.DEGREE.title"
+        [hint]="specs.DEGREE.hint"
+        [state]="state('DEGREE')"
+        [fileName]="documents().DEGREE?.name ?? null"
+        [fileSize]="documents().DEGREE?.size ?? null"
+        (picked)="pick('DEGREE', $event)"
+      />
+
+      @if (error(); as message) {
+        <p class="reg-alert reg-alert--error" role="alert">{{ message }}</p>
+      }
+    }
+
+    <vet-info-note>
+      ¿No eres veterinario? Podrás invitar a tus veterinarios después. Cada uno se verifica por separado.
+    </vet-info-note>
+  </form>
+
+  <div class="reg-footer" footer>
+    <button type="button" class="vet-btn vet-btn--secondary" (click)="back()">Atrás</button>
+    <button type="submit" form="profile-form" class="vet-btn vet-btn--primary">Continuar</button>
+  </div>
+</vet-step-frame>

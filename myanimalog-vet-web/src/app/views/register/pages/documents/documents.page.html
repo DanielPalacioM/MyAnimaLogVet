@@ -1,0 +1,35 @@
+<vet-step-frame
+  [step]="4"
+  label="DOCUMENTOS"
+  title="Documentos"
+  subtitle="Sube los documentos legales de tu clínica para verificarla."
+  [bodyTop]="26"
+>
+  <div class="reg-stack">
+    @for (type of types; track type) {
+      <vet-document-card
+        [title]="specs[type].title"
+        [hint]="specs[type].hint"
+        [state]="documents()[type] ? 'ready' : 'pending'"
+        [fileName]="documents()[type]?.name ?? null"
+        [fileSize]="documents()[type]?.size ?? null"
+        (picked)="pick(type, $event)"
+      />
+    }
+
+    <p class="formats">PDF, JPG o PNG · máximo 10 MB por archivo</p>
+
+    @if (error(); as message) {
+      <p class="reg-alert reg-alert--error" role="alert">{{ message }}</p>
+    }
+
+    <vet-info-note icon="lock_outline">
+      Tus documentos se guardan cifrados y solo los ve nuestro equipo de verificación.
+    </vet-info-note>
+  </div>
+
+  <div class="reg-footer" footer>
+    <button type="button" class="vet-btn vet-btn--secondary" (click)="back()">Atrás</button>
+    <button type="button" class="vet-btn vet-btn--primary" (click)="next()">Continuar</button>
+  </div>
+</vet-step-frame>

@@ -1,0 +1,44 @@
+.intro {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  font: 500 13px/1.4 'Afacad', sans-serif;
+  color: var(--vet-text);
+}
+
+p { margin: 0; }
+
+h2 {
+  margin: 0 0 4px;
+  font: 700 14px/1.2 'Afacad', sans-serif;
+  color: #000;
+}
+
+ul, ol { margin: 0; padding-left: 20px; }
+li + li { margin-top: 4px; }
+
+.consents {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 6px 0 0;
+  padding: 0;
+  border: 0;
+}
+
+// El aviso es largo: va dentro de un cuadro con barra de desplazamiento para no ocupar toda la pantalla.
+.terms {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  box-sizing: border-box;
+  height: 330px;
+  padding: 12px 14px;
+  overflow-y: auto;
+  border: 2px solid #000;
+  border-radius: 5px;
+  background: #fff;
+  scrollbar-width: thin;
+  scrollbar-color: var(--vet-primary) #e3e1f6;
+}
+.terms:focus-visible { outline: 2px solid var(--vet-primary); outline-offset: 2px; }

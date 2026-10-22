@@ -1,0 +1,83 @@
+<vet-step-frame
+  [step]="1"
+  label="TU CUENTA"
+  title="Crea tu cuenta"
+  [subtitleSize]="20"
+  subtitle="Solo el veterinario líder puede completar esta parte"
+  [tall]="true"
+>
+  <form id="account-form" class="reg-stack form" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+    <vet-field label="Nombre completo" for="acc-name" [large]="true" [control]="form.controls.fullName">
+      <input
+        id="acc-name"
+        class="vet-input"
+        type="text"
+        formControlName="fullName"
+        autocomplete="name"
+        placeholder="Escribe tu nombre"
+        [attr.aria-invalid]="form.controls.fullName.invalid && form.controls.fullName.touched"
+      />
+    </vet-field>
+
+    <vet-field label="Correo" for="acc-email" [large]="true" [control]="form.controls.email" [messages]="emailMessages">
+      <input
+        id="acc-email"
+        class="vet-input"
+        type="email"
+        formControlName="email"
+        autocomplete="email"
+        placeholder="tucorreo@clinica.com"
+        [attr.aria-invalid]="form.controls.email.invalid && form.controls.email.touched"
+      />
+    </vet-field>
+
+    @if (!accountCreated) {
+      <vet-field label="Contraseña" for="acc-password" [large]="true" [control]="form.controls.password">
+        <div class="password">
+          <input
+            id="acc-password"
+            class="vet-input"
+            [type]="showPassword() ? 'text' : 'password'"
+            formControlName="password"
+            autocomplete="new-password"
+            placeholder="Mínimo 8 caracteres"
+            [attr.aria-invalid]="form.controls.password.invalid && form.controls.password.touched"
+          />
+          <button
+            type="button"
+            class="toggle"
+            [attr.aria-label]="showPassword() ? 'Ocultar contraseña' : 'Mostrar contraseña'"
+            [attr.aria-pressed]="showPassword()"
+            (click)="showPassword.set(!showPassword())"
+          >
+            <mat-icon fontSet="material-icons-outlined">{{ showPassword() ? 'visibility' : 'visibility_off' }}</mat-icon>
+          </button>
+        </div>
+      </vet-field>
+    } @else {
+      <p class="reg-alert" role="status">Tu cuenta ya está creada. Sigue con el siguiente paso.</p>
+    }
+
+    @if (error(); as message) {
+      <p class="reg-alert reg-alert--error" role="alert">
+        {{ message }}
+        @if (emailTaken()) { <a routerLink="/login">Iniciar sesión</a> }
+      </p>
+    }
+
+    <button type="submit" class="vet-btn vet-btn--primary vet-btn--block submit" [disabled]="loading()">
+      {{ loading() ? 'Creando cuenta…' : accountCreated ? 'Continuar' : 'Crear cuenta' }}
+    </button>
+  </form>
+
+  <div class="footer" footer>
+    <p class="login-link">¿Ya tienes cuenta? <a routerLink="/login">Inicia sesión</a></p>
+    <p class="social-title">Síguenos en redes</p>
+    <ul class="social">
+      <li><img src="/brand/icon-instagram.png" alt="" width="13" height="13" />myanimalog</li>
+      <li><img src="/brand/icon-facebook.png" alt="" width="13" height="13" />MyanimaLog</li>
+      <li><img src="/brand/icon-x.png" alt="" width="13" height="13" />MyanimaLog</li>
+    </ul>
+    <hr class="social-line" />
+  </div>
+</vet-step-frame>

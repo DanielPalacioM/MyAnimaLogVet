@@ -1,0 +1,97 @@
+.timeline {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+// Línea que une los tres puntos (de centro a centro).
+.timeline::before {
+  content: '';
+  position: absolute;
+  top: 11px;
+  left: 16.6%;
+  right: 16.6%;
+  height: 3px;
+  border-radius: 2px;
+  background: #e3e1f6;
+}
+
+.milestone {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  text-align: center;
+}
+
+.dot {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  box-sizing: border-box;
+  border: 3px solid #e3e1f6;
+  border-radius: 50%;
+  background: #fff;
+}
+.dot mat-icon { width: 14px; height: 14px; font-size: 14px; color: #fff; }
+.dot-core { width: 8px; height: 8px; border-radius: 50%; background: var(--vet-primary); }
+
+.milestone--done .dot { border-color: var(--vet-primary); background: var(--vet-primary); }
+.milestone--current .dot { border-color: var(--vet-primary); }
+
+.milestone-label { margin-top: 6px; font: 700 11px/1.2 'Afacad', sans-serif; color: #000; }
+.milestone-detail { font: 500 10px/1.2 'Afacad', sans-serif; color: var(--vet-text-2); }
+.milestone--pending .milestone-label,
+.milestone--pending .milestone-detail { color: #6b6b80; }
+
+.reg-alert { margin-top: 14px; }
+
+.meanwhile {
+  margin-top: 22px;
+  padding: 12px;
+  border-radius: 5px;
+  background: var(--vet-soft);
+}
+.meanwhile h2 { margin: 0 0 10px; font: 700 13px/1.2 'Afacad', sans-serif; color: #000; }
+.meanwhile ul { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }
+
+.meanwhile a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 5px;
+  background: #fff;
+  color: #000;
+  font: 700 11px/1.2 'Afacad', sans-serif;
+  text-decoration: none;
+}
+.meanwhile a:hover { background: var(--vet-soft-2); }
+.meanwhile a:focus-visible { outline: 2px solid var(--vet-primary); outline-offset: 2px; }
+.meanwhile a span { flex: 1; }
+.meanwhile mat-icon { width: 16px; height: 16px; font-size: 16px; color: var(--vet-primary); }
+
+.limits {
+  margin: 16px 0 0;
+  text-align: center;
+  font: 500 10px/1.4 'Afacad', sans-serif;
+  color: #000;
+}
+
+.task-off {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 5px;
+  background: #fff;
+  color: #6b6b80;
+  font: 700 11px/1.2 'Afacad', sans-serif;
+}
+.task-off span { flex: 1; }
+.task-off small { font: 700 10px/1 'Afacad', sans-serif; color: var(--vet-primary); }
