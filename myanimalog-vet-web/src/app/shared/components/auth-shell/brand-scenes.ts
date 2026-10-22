@@ -103,7 +103,7 @@ const RIGHT: Scene[] = [
       fig('blob-7.svg', 565, 460, 70, 39),
     ],
     figmaPhoto: { x: 397, y: 478, w: 544, h: 546 },
-    photo: { src: CAT_DOG, x: 263, y: 425, w: 598, h: 599 },
+    photo: { src: CAT_DOG, x: 383, y: 425, w: 598, h: 599 },
   },
   {
     id: 'gato-frase',

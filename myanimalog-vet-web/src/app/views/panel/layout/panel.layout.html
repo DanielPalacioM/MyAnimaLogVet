@@ -1,0 +1,49 @@
+<div class="panel">
+  <aside class="sidebar">
+    <a class="brand" routerLink="/inicio" aria-label="MyAnimaLogVet, ir al inicio">
+      <span class="brand-text">MyAnimaLog&nbsp;&nbsp;<span class="brand-et">et</span></span>
+      <img src="/brand/estetoscopio.png" alt="" />
+    </a>
+
+    <nav aria-label="Principal">
+      @for (item of items; track item.path) {
+        <a [routerLink]="item.path" routerLinkActive="active" [attr.aria-label]="item.label">
+          <mat-icon fontSet="material-icons-outlined" aria-hidden="true">{{ item.icon }}</mat-icon>
+          <span>{{ item.label }}</span>
+          @if (item.badge && store.todayActiveCount() > 0) {
+            <span class="badge" [attr.aria-label]="store.todayActiveCount() + ' citas hoy'">{{ store.todayActiveCount() }}</span>
+          }
+        </a>
+      }
+    </nav>
+
+    <button type="button" class="user" [matMenuTriggerFor]="userMenu" aria-label="Menú de la cuenta">
+      <span class="avatar">{{ session.initials() }}</span>
+      <span class="who">
+        <strong>{{ session.user()?.fullName }}</strong>
+        <small>
+          <mat-icon fontSet="material-icons-outlined" aria-hidden="true">{{ verified() ? 'verified_user' : 'schedule' }}</mat-icon>
+          {{ session.clinic()?.veterinaryName }}
+        </small>
+      </span>
+    </button>
+    <mat-menu #userMenu="matMenu" xPosition="after">
+      @if (!verified()) {
+        <div class="menu-note">Tu clínica está {{ session.clinic()?.status === 'UNDER_REVIEW' ? 'en revisión' : 'pendiente' }}.</div>
+      }
+      <button mat-menu-item (click)="signOut()">
+        <mat-icon fontSet="material-icons-outlined">logout</mat-icon>
+        Cerrar sesión
+      </button>
+    </mat-menu>
+  </aside>
+
+  <main class="main" id="contenido">
+    @if (!verified()) {
+      <div class="banner" role="status">
+        Tu clínica aún no está aprobada. Puedes configurarla, pero no atender pacientes ni recibir citas.
+      </div>
+    }
+    <router-outlet />
+  </main>
+</div>

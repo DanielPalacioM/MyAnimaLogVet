@@ -1,0 +1,127 @@
+<div class="home">
+  <header class="top">
+    <form class="search" role="search" (submit)="$event.preventDefault(); search()">
+      <mat-icon fontSet="material-icons-outlined" aria-hidden="true">search</mat-icon>
+      <input type="search" name="q" [value]="query()" (input)="query.set($any($event.target).value)" placeholder="Buscar paciente, dueño o teléfono" aria-label="Buscar paciente, dueño o teléfono" />
+    </form>
+    <button type="button" class="bell" [matMenuTriggerFor]="bellMenu" aria-label="Notificaciones">
+      <mat-icon fontSet="material-icons-outlined">notifications_none</mat-icon>
+      @if (home.requests().length + home.vaccinesToNotify().length > 0) { <span class="dot" aria-hidden="true"></span> }
+    </button>
+    <mat-menu #bellMenu="matMenu" xPosition="before">
+      @if (home.requests().length) {
+        <button mat-menu-item (click)="openAgenda()">{{ home.requests().length }} solicitudes de cita por confirmar</button>
+      }
+      @if (home.vaccinesToNotify().length) {
+        <button mat-menu-item (click)="notifyVaccines()">{{ home.vaccinesToNotify().length }} vacunas vencidas</button>
+      }
+      @if (!home.requests().length && !home.vaccinesToNotify().length) {
+        <div class="menu-empty">Estás al día. No hay notificaciones nuevas.</div>
+      }
+    </mat-menu>
+    <button type="button" class="vet-btn vet-btn--primary new" (click)="newAppointment()">
+      <mat-icon fontSet="material-icons-outlined" aria-hidden="true">add</mat-icon>Nueva cita
+    </button>
+  </header>
+
+  <section class="hello" aria-label="Saludo">
+    <img src="/brand/icon-myanimalog.png" alt="" width="130" height="128" />
+    <div>
+      <p class="date">{{ home.dateLabel() }}</p>
+      <h1>{{ home.greeting() }}</h1>
+      <p class="phrase">{{ home.phrase() }}</p>
+      <div class="chips">
+        @if (home.activeToday() > 0) { <span><i class="d d--primary"></i>{{ home.activeToday() }} citas hoy</span> }
+        @if (home.requests().length > 0) { <span><i class="d d--warn"></i>{{ home.requests().length }} solicitudes por confirmar</span> }
+        @if (home.overdueCount() > 0) { <span><i class="d d--gray"></i>{{ home.overdueCount() }} vacunas vencidas</span> }
+      </div>
+    </div>
+  </section>
+
+  <div class="grid">
+    <section class="card agenda" aria-labelledby="agenda-title">
+      <header>
+        <h2 id="agenda-title">Agenda de hoy</h2>
+        <button type="button" class="link" (click)="openAgenda()">Ver agenda completa <mat-icon fontSet="material-icons-outlined" aria-hidden="true">arrow_forward</mat-icon></button>
+      </header>
+
+      @if (home.agenda().length === 0) {
+        <p class="empty">No hay citas para hoy. <button type="button" class="link" (click)="newAppointment()">Agendar una cita</button></p>
+      }
+      <ol>
+        @for (a of visible(); track a.id; let i = $index) {
+          <li>
+            <div class="time" [class.time--next]="a.id === home.nextId()">
+              <strong>{{ hour(a).time }}</strong><small>{{ hour(a).suffix }}</small>
+            </div>
+            <button type="button" class="appt" [class.appt--next]="a.id === home.nextId()" (click)="openAgenda()" [attr.aria-label]="'Ver cita de ' + a.patientName">
+              <span class="av" [style.background]="avatar(i)"><mat-icon fontSet="material-icons-outlined" aria-hidden="true">pets</mat-icon></span>
+              <span class="info">
+                @if (a.id === home.nextId()) { <small class="next">PRÓXIMA · EN {{ home.minutesUntil(a.start) }} MIN</small> }
+                <span class="who"><strong>{{ a.patientName }}</strong> {{ breed(a) }}</span>
+                <span class="svc">{{ a.service }} · {{ professionalName(a) }}</span>
+              </span>
+              <vet-status-chip [status]="a.status" />
+            </button>
+          </li>
+        }
+      </ol>
+      @if (hidden() > 0) {
+        <button type="button" class="link more" (click)="showAll.set(!showAll())">
+          {{ showAll() ? 'Ver menos' : hidden() + ' citas más esta tarde' }}
+        </button>
+      }
+    </section>
+
+    <div class="side">
+      <section class="card" aria-labelledby="pend-title">
+        <h2 id="pend-title">Por resolver <span class="count">{{ home.pendingTotal() }}</span></h2>
+        <ul class="tasks">
+          @if (home.requests().length) {
+            <li>
+              <i class="d d--warn"></i>
+              <span><strong>{{ home.requests().length }} {{ home.requests().length === 1 ? 'solicitud' : 'solicitudes' }} de cita</strong><small>Desde la app · hoy</small></span>
+              <button type="button" class="vet-btn vet-btn--secondary mini" (click)="openAgenda()">Revisar</button>
+            </li>
+          }
+          @if (home.vaccinesToNotify().length) {
+            <li>
+              <i class="d d--warn"></i>
+              <span><strong>{{ home.vaccinesToNotify().length }} vacunas vencidas</strong><small>Rabia y polivalente</small></span>
+              <button type="button" class="vet-btn vet-btn--secondary mini" (click)="notifyVaccines()">Avisar</button>
+            </li>
+          }
+          @for (inv of home.invitations(); track inv.id) {
+            <li>
+              <i class="d d--gray"></i>
+              <span><strong>{{ inv.name }} no ha aceptado la invitación</strong><small>Enviada {{ inv.sentAgo }}</small></span>
+              <button type="button" class="vet-btn vet-btn--secondary mini" (click)="resend(inv.id, inv.name)">Reenviar</button>
+            </li>
+          }
+        </ul>
+        @if (home.pendingTotal() === 0) { <p class="empty">Todo resuelto por ahora.</p> }
+      </section>
+
+      <section class="card" aria-labelledby="quick-title">
+        <h2 id="quick-title">Acciones rápidas</h2>
+        <div class="quick">
+          <button type="button" (click)="newAppointment()"><mat-icon fontSet="material-icons-outlined" aria-hidden="true">calendar_today</mat-icon>Nueva cita</button>
+          <button type="button" (click)="addPatient()"><mat-icon fontSet="material-icons-outlined" aria-hidden="true">pets</mat-icon>Registrar paciente</button>
+          <button type="button" (click)="qr()"><mat-icon fontSet="material-icons-outlined" aria-hidden="true">qr_code_2</mat-icon>Código QR</button>
+          <button type="button" (click)="invite()"><mat-icon fontSet="material-icons-outlined" aria-hidden="true">person_add_alt</mat-icon>Invitar compañero</button>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="clinic-title">
+        <header>
+          <h2 id="clinic-title">Mi clínica</h2>
+          <button type="button" class="link" (click)="seePlan()">Ver plan <mat-icon fontSet="material-icons-outlined" aria-hidden="true">arrow_forward</mat-icon></button>
+        </header>
+        <div class="meter"><span>{{ home.planLabel }}</span><strong>Renueva el {{ home.renewsOn() }}</strong></div>
+        <div class="bar" role="progressbar" aria-label="Avance del plan" [attr.aria-valuenow]="home.planProgress" aria-valuemin="0" aria-valuemax="100"><span [style.width.%]="home.planProgress"></span></div>
+        <div class="meter"><span>Espacio usado</span><strong>{{ home.storageUsedGb }} GB de {{ home.storageTotalGb }} GB</strong></div>
+        <div class="bar" role="progressbar" aria-label="Espacio usado" [attr.aria-valuenow]="home.storageUsedGb / home.storageTotalGb * 100" aria-valuemin="0" aria-valuemax="100"><span [style.width.%]="home.storageUsedGb / home.storageTotalGb * 100"></span></div>
+      </section>
+    </div>
+  </div>
+</div>

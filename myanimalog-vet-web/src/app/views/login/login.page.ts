@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
+import { SessionService } from '@auth/services/session.service';
 import { TokenService } from '@auth/services/token.service';
 import { LoginCredentials } from '@services/login/login.models';
 import { LoginService } from '@services/login/login.service';
@@ -17,6 +18,7 @@ import { RegistrationStore } from '@services/register/registration.store';
 export class LoginPage {
   private readonly api = inject(LoginService);
   private readonly tokens = inject(TokenService);
+  private readonly session = inject(SessionService);
   private readonly registration = inject(RegistrationStore);
   private readonly router = inject(Router);
 
@@ -31,6 +33,7 @@ export class LoginPage {
     this.api.login(credentials).subscribe({
       next: ({ tokens, user }) => {
         this.tokens.save(tokens);
+        this.session.signIn(user);
         this.loading.set(false);
         this.goNext(user);
       },
@@ -41,7 +44,7 @@ export class LoginPage {
     });
   }
 
-  /** Sin clínica → registro. En revisión → su pantalla de estado. Aprobada → panel (aún no existe). */
+  /** Sin clínica → registro. En revisión → su pantalla de estado. Aprobada → panel. */
   private goNext(user: AccountUser): void {
     const clinic = user.clinic;
     if (!clinic) {
@@ -57,7 +60,7 @@ export class LoginPage {
       });
       void this.router.navigateByUrl('/registro/estado');
     } else {
-      this.notice.set(`Hola, ${user.fullName.split(' ')[0]}. El panel de tu clínica estará disponible pronto.`);
+      void this.router.navigateByUrl('/inicio');
     }
   }
 }

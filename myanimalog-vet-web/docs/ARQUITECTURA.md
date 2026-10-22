@@ -5,9 +5,10 @@ Angular 20 + Angular Material + SCSS. Cada vista es un módulo (`NgModule`) con 
 ```
 src/app/
 ├── auth/
+│   ├── guards/auth.guard.ts    protege el panel (sin sesión → /login)
 │   ├── auth.config.ts          prefijo de la API y endpoints públicos
 │   ├── interceptor/auth.interceptor.ts   pasa el token y renueva con refresh ante un 401
-│   └── services/token.service.ts         guarda access + refresh token
+│   └── services/               token.service (access + refresh) · session.service (usuario y clínica)
 ├── shared/
 │   ├── shared.module.ts        módulo que importan las vistas (Common, ReactiveForms, Router, MatIcon + componentes)
 │   ├── components/             auth-shell (columna de marca animada), form-field, choice-cards, otp-input,
@@ -17,8 +18,15 @@ src/app/
 ├── services/
 │   ├── api-error.ts · mock/    errores y datos de prueba compartidos (directorio de cuentas, latencia)
 │   ├── login/                  login.service (contrato) · login.mock.service · login.models
-│   └── register/               register.service · register.mock.service · registration.store · step-navigator · models/
+│   ├── register/               register.service · register.mock.service · registration.store · step-navigator · models/
+│   ├── clinic/                 clinic.store (pacientes, citas, solicitudes de prueba) · models · seed · date.utils
+│   ├── home/ agenda/ patients/ estado y datos de cada vista (HomeService, AgendaService, PatientsService)
+│   └── panel/                  panel-actions.service (abre los diálogos: nueva cita, agregar paciente, invitar)
 └── views/
+    ├── panel/     panel.module · panel-routing.module · layout/ (menú lateral) · pages/coming-soon (secciones pendientes)
+    ├── home/      Inicio:   home.page.* · home.module · home-routing.module
+    ├── agenda/    Agenda:   agenda.page.* · agenda.module · agenda-routing.module
+    ├── patients/  Pacientes: patients.page.* · patients.module · patients-routing.module
     ├── login/     login.page.* · login-routing.module.ts · login.module.ts
     └── register/  register.module.ts · register-routing.module.ts
                    ├── layout/   register.layout (marco con la columna de marca)
@@ -44,3 +52,12 @@ src/app/
 - Tipografías: valores del Figma (DISENO §5): títulos 64 (48 en el aviso), etiquetas 16 (20 en login y paso 1), campos 14, ayudas 12, botones 15 (12 en el botón del login).
 
 - Escenas actuales (`brand-scenes.ts`, cambian cada 15 s con desvanecimiento, una a la vez): login = logo con el perrito (imagotipo) → perro (Figma) → perro y gato → gato; registro = gato (Figma) → gato con perro (Figma) → gato con frase. Las manchas del Figma siguen a su foto (`figmaPhoto`). La animación se muestra aunque el sistema pida reducir movimiento (solo cambia la opacidad).
+
+## Panel (Inicio, Agenda, Pacientes)
+
+- Rutas protegidas por `authGuard`: `/inicio`, `/agenda`, `/pacientes` (cada una un módulo lazy bajo `PanelModule`). Clientes, Reportes, Equipo, Servicios y horarios, Mi clínica y Plan muestran "disponible pronto".
+- Datos de prueba en memoria (`ClinicStore`): 249 pacientes (161 perros, 80 gatos, 8 otros), agenda de hoy como el Figma, solicitudes de la app e invitaciones. Se reinician al recargar. Al conectar el backend se reemplaza `ClinicStore` y las vistas no cambian.
+- Inicio (`1932:159`): búsqueda → Pacientes, campana, Nueva cita, agenda de hoy, "Por resolver" (Revisar/Avisar/Reenviar), acciones rápidas (diálogos), resumen de la clínica.
+- Agenda (`1941:174`): día por profesional (72 px/hora, almuerzo bloqueado, línea de ahora) y semana; calendario, solicitudes (aceptar/rechazar), detalle de la cita con acciones por estado.
+- Pacientes (`1958:174`): búsqueda, pestañas por especie, filtros, orden, paginación (9 por página) y ficha.
+- La clínica en revisión entra al panel con un aviso; "Ir al panel" del estado y el login con clínica activa llevan a `/inicio`.

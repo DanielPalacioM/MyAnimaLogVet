@@ -1,0 +1,176 @@
+<div class="agenda">
+  <header class="head">
+    <h1>Agenda</h1>
+    <div class="nav">
+      <button type="button" class="sq" (click)="agenda.step(-1)" aria-label="Anterior"><mat-icon fontSet="material-icons-outlined">chevron_left</mat-icon></button>
+      <button type="button" class="sq today" (click)="agenda.today()">Hoy</button>
+      <button type="button" class="sq" (click)="agenda.step(1)" aria-label="Siguiente"><mat-icon fontSet="material-icons-outlined">chevron_right</mat-icon></button>
+      <span class="when" aria-live="polite">{{ agenda.view() === 'week' ? weekTitle() : title() }}</span>
+    </div>
+    <div class="seg" role="group" aria-label="Vista">
+      <button type="button" [class.on]="agenda.view() === 'day'" [attr.aria-pressed]="agenda.view() === 'day'" (click)="agenda.view.set('day')">Día</button>
+      <button type="button" [class.on]="agenda.view() === 'week'" [attr.aria-pressed]="agenda.view() === 'week'" (click)="agenda.view.set('week')">Semana</button>
+    </div>
+    <button type="button" class="vet-btn vet-btn--primary" (click)="newAppointment()"><mat-icon fontSet="material-icons-outlined" aria-hidden="true">add</mat-icon>Nueva cita</button>
+  </header>
+
+  <div class="body">
+    <aside class="left">
+      <section class="card cal" aria-label="Calendario">
+        <header>
+          <strong>{{ monthTitle() }}</strong>
+          <span>
+            <button type="button" class="ic" (click)="agenda.stepMonth(-1)" aria-label="Mes anterior"><mat-icon fontSet="material-icons-outlined">chevron_left</mat-icon></button>
+            <button type="button" class="ic" (click)="agenda.stepMonth(1)" aria-label="Mes siguiente"><mat-icon fontSet="material-icons-outlined">chevron_right</mat-icon></button>
+          </span>
+        </header>
+        <div class="weekdays" aria-hidden="true">@for (w of weekdays; track $index) { <span>{{ w }}</span> }</div>
+        <div class="days">
+          @for (c of cells(); track c.day) {
+            <button type="button" [class.out]="!c.inMonth" [class.wk]="c.weekend" [class.sel]="c.selected" [class.today]="c.today" (click)="pick(c.day)" [attr.aria-label]="c.label + (c.dot ? ', con citas' : '')" [attr.aria-pressed]="c.selected">
+              {{ c.label }}@if (c.dot) { <i></i> }
+            </button>
+          }
+        </div>
+      </section>
+
+      <section class="card reqs" aria-labelledby="req-title">
+        <h2 id="req-title">Solicitudes de la app <span class="count">{{ agenda.requests().length }}</span></h2>
+        @for (r of agenda.requests(); track r.id) {
+          <article class="req">
+            <p><strong>{{ r.patientName }}</strong> {{ r.service }}</p>
+            <small>{{ time(r.start) }} · {{ professional(r.professionalId)?.name }}</small>
+            <div class="acts">
+              <button type="button" class="vet-btn vet-btn--primary mini" (click)="accept(r)">Aceptar</button>
+              <button type="button" class="vet-btn vet-btn--secondary mini" (click)="reject(r)">Rechazar</button>
+            </div>
+          </article>
+        } @empty {
+          <p class="none">No hay solicitudes pendientes.</p>
+        }
+      </section>
+
+      <section class="card legend" aria-labelledby="leg-title">
+        <h2 id="leg-title">Estados</h2>
+        @for (l of legend; track l.status) {
+          <p><i [style.border-color]="colors[l.status].border" [style.background]="colors[l.status].bg" [class.dash]="l.status === 'REQUESTED'"></i>{{ l.label }}</p>
+        }
+      </section>
+    </aside>
+
+    <section class="grid card" [attr.aria-label]="agenda.view() === 'day' ? 'Agenda del día' : 'Agenda de la semana'">
+      @if (agenda.view() === 'day') {
+        <div class="cols" [style.grid-template-columns]="'56px repeat(' + agenda.professionals.length + ', minmax(0, 1fr))'">
+          <div class="corner"></div>
+          @for (p of agenda.professionals; track p.id) {
+            <div class="prof">
+              <span class="pav" [style.background]="p.color">{{ p.initials }}</span>
+              <span>
+                <strong>{{ p.name }}</strong>
+                <small>@if (p.verified) { <mat-icon fontSet="material-icons-outlined" aria-hidden="true">verified_user</mat-icon> }{{ p.role }} · {{ agenda.activeCountFor(p.id) }} citas</small>
+              </span>
+            </div>
+          }
+        </div>
+        <div class="scroll">
+          <div class="cols body-cols" [style.grid-template-columns]="'56px repeat(' + agenda.professionals.length + ', minmax(0, 1fr))'" [style.height.px]="gridHeight">
+            <div class="hours">
+              @for (h of hours; track h; let i = $index) {
+                <span [style.top.px]="i * hourPx"><b>{{ hourLabel(h).time }}</b><small>{{ hourLabel(h).suffix }}</small></span>
+              }
+            </div>
+            @for (p of agenda.professionals; track p.id) {
+              <div class="col" (dblclick)="newAppointment()" [style.background-size]="'100% ' + hourPx + 'px'">
+                <div class="block lunch" [style.top.px]="(lunch.from - 8) * hourPx" [style.height.px]="(lunch.to - lunch.from) * hourPx - 4">Almuerzo</div>
+                @for (a of agenda.forProfessional(p.id); track a.id) {
+                  @if (inRange(a)) {
+                    <button
+                      type="button"
+                      class="block appt"
+                      [class.dash]="a.status === 'REQUESTED'"
+                      [class.next]="a.id === agenda.nextId()"
+                      [class.faded]="a.status === 'COMPLETED'"
+                      [class.tall]="isTall(a)"
+                      [style.top.px]="top(a)"
+                      [style.height.px]="height(a)"
+                      [style.background]="colors[a.status].bg"
+                      [style.border-color]="a.id === agenda.nextId() ? '#4037be' : colors[a.status].border"
+                      (click)="open(a)"
+                      [attr.aria-label]="a.patientName + ', ' + a.service + ', ' + time(a.start)"
+                    >
+                      @if (isTall(a)) {
+                        <small class="range" [style.color]="colors[a.status].fg">{{ range(a) }}</small>
+                        <span><strong [class.strike]="a.status === 'NO_SHOW'">{{ a.patientName }}</strong></span>
+                        <small>{{ a.service }}</small>
+                      } @else {
+                        <strong [class.strike]="a.status === 'NO_SHOW'">{{ a.patientName }}</strong>
+                        <span class="svc">{{ a.service }}</span>
+                        <vet-status-chip [status]="a.id === agenda.nextId() ? 'CONFIRMED' : a.status" />
+                      }
+                    </button>
+                  }
+                }
+              </div>
+            }
+            @if (nowLine(); as line) {
+              <div class="now" [style.top.px]="line.top"><b>{{ line.label }}</b></div>
+            }
+          </div>
+        </div>
+      } @else {
+        <div class="week">
+          @for (d of agenda.weekDays(); track d) {
+            <div class="wday" [class.sel]="isSelected(d)">
+              <button type="button" class="wh" (click)="pick(d); agenda.view.set('day')">
+                <small>{{ dayLabel(d).name }}</small><strong>{{ dayLabel(d).num }}</strong>
+              </button>
+              @for (a of agenda.appointmentsOn(d); track a.id) {
+                <button type="button" class="chip" [style.background]="colors[a.status].bg" [style.border-color]="colors[a.status].border" [class.dash]="a.status === 'REQUESTED'" (click)="open(a)">
+                  <b>{{ time(a.start) }}</b> {{ a.patientName }}
+                </button>
+              } @empty {
+                <span class="free">Libre</span>
+              }
+            </div>
+          }
+        </div>
+      }
+    </section>
+  </div>
+
+  @if (agenda.selected(); as a) {
+    <div class="backdrop" (click)="close()"></div>
+    <aside class="drawer" role="dialog" aria-label="Detalle de la cita">
+      <header>
+        <h2>{{ a.patientName }}</h2>
+        <button type="button" class="ic" (click)="close()" aria-label="Cerrar detalle"><mat-icon fontSet="material-icons-outlined">close</mat-icon></button>
+      </header>
+      <vet-status-chip [status]="a.status" />
+      <dl>
+        <div><dt>Mascota</dt><dd>{{ patient(a)?.species }} · {{ patient(a)?.breed }} · {{ patient(a)?.age }}</dd></div>
+        <div><dt>Fecha</dt><dd>{{ dateLabel(a.start) }} · {{ range(a) }}</dd></div>
+        <div><dt>Profesional</dt><dd>{{ professional(a.professionalId)?.name }}</dd></div>
+        <div><dt>Servicio</dt><dd>{{ a.service }}</dd></div>
+        <div><dt>Dueño</dt><dd>{{ patient(a)?.owner }}<button type="button" class="link" (click)="call(patient(a)?.phone ?? '')">Llamar {{ patient(a)?.phone }}</button></dd></div>
+      </dl>
+      <div class="actions">
+        @switch (a.status) {
+          @case ('REQUESTED') {
+            <button type="button" class="vet-btn vet-btn--primary" (click)="change(a, 'CONFIRMED', 'Cita confirmada')">Confirmar</button>
+            <button type="button" class="vet-btn vet-btn--secondary" (click)="reject(a)">Rechazar</button>
+          }
+          @case ('CONFIRMED') {
+            <button type="button" class="vet-btn vet-btn--primary" (click)="change(a, 'CHECKED_IN', a.patientName + ' llegó a la clínica')">Marcar llegada</button>
+            <button type="button" class="vet-btn vet-btn--secondary" (click)="change(a, 'NO_SHOW', 'Marcada como no asistió')">No asistió</button>
+          }
+          @case ('CHECKED_IN') {
+            <button type="button" class="vet-btn vet-btn--primary" (click)="change(a, 'COMPLETED', 'Cita atendida')">Atendida</button>
+          }
+        }
+        @if (a.status !== 'CANCELLED' && a.status !== 'COMPLETED') {
+          <button type="button" class="danger" (click)="change(a, 'CANCELLED', 'Cita cancelada')">Cancelar cita</button>
+        }
+      </div>
+    </aside>
+  }
+</div>

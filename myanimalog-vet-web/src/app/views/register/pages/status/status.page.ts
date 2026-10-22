@@ -31,7 +31,7 @@ export class StatusPage {
   private readonly receipt = this.store.receipt;
 
   /** El panel todavía no existe: hasta entonces los accesos a "Ir al panel" quedan desactivados. */
-  protected readonly panelReady = false;
+  protected readonly panelReady = true;
 
   protected readonly status = signal<VerificationStatus>('UNDER_REVIEW');
   protected readonly submittedAt = signal<string>(this.receipt()?.submittedAt ?? new Date().toISOString());

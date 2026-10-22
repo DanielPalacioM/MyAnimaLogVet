@@ -1,7 +1,7 @@
 .reg-grid {
   // Filas del Figma 1901:132: etiquetas en y = 244, 327, 402, 477 y 544 (alto 82, 75, 75 y 67).
-  grid-template-rows: 82px 75px 75px 67px auto;
-  row-gap: 0;
+  grid-template-rows: minmax(82px, auto) minmax(75px, auto) minmax(75px, auto) minmax(67px, auto) auto;
+  row-gap: 6px;
   align-items: start;
 }
 

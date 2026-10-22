@@ -49,8 +49,6 @@
 
   <div class="reg-footer" footer>
     <button type="button" class="vet-btn vet-btn--secondary" (click)="registerAnother()">Registrar otra clínica</button>
-    <button type="button" class="vet-btn vet-btn--primary" [disabled]="!panelReady" title="El panel estará disponible pronto">
-      Ir al panel
-    </button>
+    <a routerLink="/inicio" class="vet-btn vet-btn--primary">Ir al panel</a>
   </div>
 </vet-step-frame>
