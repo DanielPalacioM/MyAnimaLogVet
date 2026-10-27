@@ -1,17 +1,12 @@
 import { ChangeDetectionStrategy, Component, inject, OnInit } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { PAGE_SIZE, PatientSort, PatientsService, SpeciesTab } from '@services/patients/patients.service';
-import { Appointment, STATUS_LABEL, VaccineState } from '@services/clinic/clinic.models';
+import { Appointment, STATUS_LABEL } from '@services/clinic/clinic.models';
 import { dayMonth, hourParts, longDate, sameDay } from '@services/clinic/date.utils';
 import { ClinicStore } from '@services/clinic/clinic.store';
+import { patientExtras, VACCINE } from '@services/clinic/patient-details';
 import { PanelActionsService } from '@services/panel/panel-actions.service';
 
-const VACCINE: Record<VaccineState, { label: string; fg: string; bg: string }> = {
-  OK: { label: 'Al día', fg: '#2E7D32', bg: '#E8F5E9' },
-  DUE: { label: 'Por vencer', fg: '#B26A00', bg: '#FFF4E0' },
-  OVERDUE: { label: 'Vencida', fg: '#B42318', bg: '#FEF3F2' },
-  NONE: { label: 'Sin registro', fg: '#3D3D4E', bg: '#E6E6EB' },
-};
 
 /** Pacientes (Figma 1958:174): lista con búsqueda, filtros, orden, paginación y ficha. */
 @Component({
@@ -42,6 +37,7 @@ export class PatientsPage implements OnInit {
   protected readonly vaccine = VACCINE;
   protected readonly statusLabel = STATUS_LABEL;
   protected readonly pageSize = PAGE_SIZE;
+  protected readonly extras = patientExtras;
 
   ngOnInit(): void {
     // Viene de la búsqueda del Inicio: /pacientes?q=...
@@ -91,6 +87,28 @@ export class PatientsPage implements OnInit {
 
   protected add(): void {
     this.actions.addPatient();
+  }
+
+  /** "hoy, 10:30 a. m." / "24 oct, 4:00 p. m." */
+  protected nextWhen(a: Appointment): string {
+    const t = hourParts(a.start);
+    return `${sameDay(a.start, this.store.now()) ? 'hoy' : dayMonth(a.start)}, ${t.time} ${t.suffix}`;
+  }
+
+  protected professionalName(a: Appointment): string {
+    return this.store.professional(a.professionalId)?.name ?? '';
+  }
+
+  protected registerVisit(name: string): void {
+    this.actions.toast(`Visita de ${name} registrada`);
+  }
+
+  protected uploadDoc(): void {
+    this.actions.toast('Subir documentos estará disponible pronto');
+  }
+
+  protected soon(): void {
+    this.actions.toast('La historia completa estará disponible pronto');
   }
 
   protected claimLink(owner: string): void {

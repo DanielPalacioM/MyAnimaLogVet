@@ -58,6 +58,26 @@ export const dayMonth = (ms: number): string => {
   return `${d.getDate()} ${MONTHS[d.getMonth()].slice(0, 3)}`;
 };
 
+/** "hace 2 días", "hace 3 h", "hace un momento". */
+export const timeAgo = (ms: number, now = Date.now()): string => {
+  const min = Math.floor((now - ms) / 60_000);
+  if (min < 1) return 'hace un momento';
+  if (min < 60) return `hace ${min} min`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `hace ${h} h`;
+  const d = Math.floor(h / 24);
+  return `hace ${d} ${d === 1 ? 'día' : 'días'}`;
+};
+
+/** "3 mar 2026" */
+export const fullDate = (ms: number): string => `${dayMonth(ms)} ${new Date(ms).getFullYear()}`;
+
+/** "3 de marzo de 2026" */
+export const longDay = (ms: number): string => {
+  const d = new Date(ms);
+  return `${d.getDate()} de ${MONTHS[d.getMonth()]} de ${d.getFullYear()}`;
+};
+
 export const isoDate = (ms: number): string => {
   const d = new Date(ms);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;

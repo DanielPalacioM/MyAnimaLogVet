@@ -5,7 +5,7 @@ import { AppointmentStatus, STATUS_COLOR, STATUS_LABEL } from '@services/clinic/
 @Component({
   selector: 'vet-status-chip',
   template: `<span class="chip" [style.color]="c().fg" [style.background]="c().bg">{{ label() }}</span>`,
-  styles: `.chip { display: inline-block; padding: 4px 10px; border-radius: 999px; font: 700 11px/1 'Afacad', sans-serif; white-space: nowrap; }`,
+  styles: `.chip { display: inline-block; padding: 4px 10px; border-radius: 12px; font: 700 12px/1.25 'Afacad', sans-serif; white-space: nowrap; }`,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class StatusChip {

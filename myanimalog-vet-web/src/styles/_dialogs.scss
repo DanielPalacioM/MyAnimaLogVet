@@ -1,0 +1,15 @@
+// Diálogos con el marco de los modales del diseño (Figma 1966:630): radio 14, sin relleno propio.
+.vet-dialog {
+  --mdc-dialog-container-shape: 14px;
+  --mdc-dialog-container-color: #fff;
+  --mat-dialog-container-max-width: 92vw;
+
+  .mat-mdc-dialog-surface {
+    overflow: visible;
+    box-shadow: 0 12px 40px rgb(32 27 97 / 18%);
+  }
+}
+
+.vet-backdrop {
+  background: rgb(26 26 46 / 45%);
+}

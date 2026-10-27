@@ -1,14 +1,14 @@
 <div class="panel">
   <aside class="sidebar">
     <a class="brand" routerLink="/inicio" aria-label="MyAnimaLogVet, ir al inicio">
-      <span class="brand-text">MyAnimaLog&nbsp;&nbsp;<span class="brand-et">et</span></span>
+      <span class="brand-text">MyAnimaLog&nbsp;&nbsp;&nbsp;<span class="brand-et">et</span></span>
       <img src="/brand/estetoscopio.png" alt="" />
     </a>
 
     <nav aria-label="Principal">
       @for (item of items; track item.path) {
         <a [routerLink]="item.path" routerLinkActive="active" [attr.aria-label]="item.label">
-          <mat-icon fontSet="material-icons-outlined" aria-hidden="true">{{ item.icon }}</mat-icon>
+          <vet-icon [name]="item.icon" [size]="18" />
           <span>{{ item.label }}</span>
           @if (item.badge && store.todayActiveCount() > 0) {
             <span class="badge" [attr.aria-label]="store.todayActiveCount() + ' citas hoy'">{{ store.todayActiveCount() }}</span>
@@ -22,7 +22,7 @@
       <span class="who">
         <strong>{{ session.user()?.fullName }}</strong>
         <small>
-          <mat-icon fontSet="material-icons-outlined" aria-hidden="true">{{ verified() ? 'verified_user' : 'schedule' }}</mat-icon>
+          <vet-icon [name]="verified() ? 'shield' : 'clock'" [size]="13" />
           {{ session.clinic()?.veterinaryName }}
         </small>
       </span>

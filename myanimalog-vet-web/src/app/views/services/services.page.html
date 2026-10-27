@@ -1,0 +1,82 @@
+<div class="page">
+  <header class="head">
+    <h1>Servicios y horarios</h1>
+    <small class="total">{{ svc.summary() }}</small>
+    <button type="button" class="btn btn--soft" (click)="addBlock()">Agregar bloqueo</button>
+    <button type="button" class="vet-btn vet-btn--primary" (click)="newService()"><vet-icon name="plus" [size]="16" />Nuevo servicio</button>
+  </header>
+
+  <div class="body">
+    <section class="card catalog" aria-label="Catálogo de servicios">
+      <div class="card-head">
+        <h2>Catálogo de servicios</h2>
+        <span class="hint">Los marcados "En línea" se pueden pedir desde la app</span>
+      </div>
+      <div class="row hdr" role="row">
+        <span>SERVICIO</span><span>DURACIÓN</span><span>PRECIO</span><span>EN LÍNEA</span><span></span>
+      </div>
+      @for (s of svc.services(); track s.id) {
+        <div class="row item" [class.off]="!s.active">
+          <span class="name">
+            <span class="name-line"><strong>{{ s.name }}</strong>@if (!s.active) { <em class="chip"><i></i>Inactivo</em> }</span>
+            <small>{{ svc.subLabel(s) }}</small>
+          </span>
+          <span class="dur">{{ svc.duration(s.minutes) }}</span>
+          <strong class="price">{{ svc.price(s.price) }}</strong>
+          <span><vet-switch [checked]="s.online" (checkedChange)="setOnline(s, $event)" [disabled]="!s.active" [label]="'Se puede pedir desde la app: ' + s.name" /></span>
+          <span class="more">
+            <button type="button" class="dots" [matMenuTriggerFor]="rowMenu" [matMenuTriggerData]="{ service: s }" [attr.aria-label]="'Más acciones de ' + s.name"><i></i><i></i><i></i></button>
+          </span>
+        </div>
+      }
+      <p class="note">Un servicio con citas no se borra: se desactiva, y las citas ya pedidas conservan su precio y duración.</p>
+    </section>
+
+    <div class="side">
+      <section class="card" aria-label="Horario de atención">
+        <div class="card-head">
+          <h2>Horario de atención</h2>
+          <button type="button" class="link" (click)="editSchedule()">Editar</button>
+        </div>
+        @for (d of svc.schedule(); track d.day) {
+          <div class="day" [class.today]="d.day === svc.todayIndex()">
+            <strong>{{ svc.dayName(d.day) }}</strong>
+            <span [class.closed]="!d.open">{{ svc.hours(d) }}</span>
+            @if (d.day === svc.todayIndex()) { <em class="chip chip--today"><i></i>Hoy</em> }
+          </div>
+        }
+        <div class="line">
+          <strong>Horarios por profesional</strong>
+          <button type="button" class="link" (click)="professionalSchedules()">Ver {{ svc.professionalsCount() }} profesionales</button>
+        </div>
+        <div class="line line--tz"><span>Zona horaria</span><b>Bogotá (GMT−5)</b></div>
+      </section>
+
+      <section class="card" aria-label="Próximos bloqueos">
+        <div class="card-head">
+          <h2>Próximos bloqueos</h2>
+          <em class="chip chip--count">{{ svc.upcomingBlocks().length }}</em>
+          <button type="button" class="link push" (click)="addBlock()">Agregar</button>
+        </div>
+        @for (b of svc.upcomingBlocks(); track b.id) {
+          <div class="block">
+            <span class="tile"><b>{{ svc.tileDay(b) }}</b><small>{{ svc.tileMonth(b) }}</small></span>
+            <span class="btxt"><strong>{{ b.title }}</strong><small>{{ svc.blockSub(b) }}</small></span>
+            @if (closesAllClinic(b)) { <em class="chip chip--warn">Cerrado</em> }
+            <button type="button" class="x" (click)="removeBlock(b)" [attr.aria-label]="'Quitar bloqueo ' + b.title">✕</button>
+          </div>
+        } @empty {
+          <p class="empty">No hay bloqueos próximos.</p>
+        }
+      </section>
+    </div>
+  </div>
+
+  <mat-menu #rowMenu="matMenu" xPosition="before">
+    <ng-template matMenuContent let-s="service">
+      <button mat-menu-item (click)="edit(s)">Editar</button>
+      <button mat-menu-item (click)="toggleActive(s)">{{ s.active ? 'Desactivar' : 'Activar' }}</button>
+      <button mat-menu-item (click)="remove(s)">Eliminar</button>
+    </ng-template>
+  </mat-menu>
+</div>

@@ -109,7 +109,7 @@ export class NewAppointmentDialog {
     return SLOTS.map((value) => {
       const start = at(day, value);
       const [h, m] = value.split(':').map(Number);
-      const busy = start < now || (h >= 12 && h < 13) || this.store.hasConflict(v.professional ?? "", start, minutes);
+      const busy = start < now || !!this.store.unavailableReason(start, minutes, v.professional) || this.store.hasConflict(v.professional ?? "", start, minutes);
       return { value, busy, label: `${h % 12 === 0 ? 12 : h % 12}:${String(m).padStart(2, '0')} ${h < 12 ? 'a. m.' : 'p. m.'}` };
     });
   });

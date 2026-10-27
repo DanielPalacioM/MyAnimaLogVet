@@ -53,11 +53,22 @@ src/app/
 
 - Escenas actuales (`brand-scenes.ts`, cambian cada 15 s con desvanecimiento, una a la vez): login = logo con el perrito (imagotipo) → perro (Figma) → perro y gato → gato; registro = gato (Figma) → gato con perro (Figma) → gato con frase. Las manchas del Figma siguen a su foto (`figmaPhoto`). La animación se muestra aunque el sistema pida reducir movimiento (solo cambia la opacidad).
 
-## Panel (Inicio, Agenda, Pacientes)
+## Panel (Inicio, Agenda, Pacientes, Clientes, Equipo, Servicios y horarios, Mi clínica)
 
-- Rutas protegidas por `authGuard`: `/inicio`, `/agenda`, `/pacientes` (cada una un módulo lazy bajo `PanelModule`). Clientes, Reportes, Equipo, Servicios y horarios, Mi clínica y Plan muestran "disponible pronto".
+- Rutas protegidas por `authGuard`: `/inicio`, `/agenda`, `/pacientes`, `/clientes`, `/equipo`, `/servicios`, `/mi-clinica` (cada una un módulo lazy bajo `PanelModule`). Reportes y Plan muestran "disponible pronto".
 - Datos de prueba en memoria (`ClinicStore`): 249 pacientes (161 perros, 80 gatos, 8 otros), agenda de hoy como el Figma, solicitudes de la app e invitaciones. Se reinician al recargar. Al conectar el backend se reemplaza `ClinicStore` y las vistas no cambian.
 - Inicio (`1932:159`): búsqueda → Pacientes, campana, Nueva cita, agenda de hoy, "Por resolver" (Revisar/Avisar/Reenviar), acciones rápidas (diálogos), resumen de la clínica.
 - Agenda (`1941:174`): día por profesional (72 px/hora, almuerzo bloqueado, línea de ahora) y semana; calendario, solicitudes (aceptar/rechazar), detalle de la cita con acciones por estado.
 - Pacientes (`1958:174`): búsqueda, pestañas por especie, filtros, orden, paginación (9 por página) y ficha.
 - La clínica en revisión entra al panel con un aviso; "Ir al panel" del estado y el login con clínica activa llevan a `/inicio`.
+
+### Clientes, Equipo, Servicios y horarios, Mi clínica
+
+- Todo sale de `ClinicStore` (una sola fuente): `members`, `invitations`, `catalog`, `schedule`, `blocks`, `profile`, `linkCode` y los `clients` (dueños con mascotas compartidas, derivados de `patients`). Cada vista tiene su servicio (`services/clients|team|catalog|clinic-profile`).
+- Coherencia entre pantallas: el catálogo alimenta "Nueva cita" (solo servicios activos); el horario y los bloqueos cierran horas en ese diálogo (`unavailableReason`); quitar un cliente deja sus mascotas "Por reclamar" en Pacientes; el código de vinculación es el mismo en Clientes, Mi clínica y "Agregar paciente"; las invitaciones del Equipo son las de "Por resolver" en Inicio.
+- Clientes (`1964:219`, ficha `1964:905`): búsqueda, filtros, orden, paginación, ficha, QR, quitar cliente.
+- Equipo (`1965:219`, ficha `1966:219`, invitar `1966:630`): invitar (7 días), reenviar/cancelar, cambiar rol, transferir propiedad, desactivar.
+- Servicios y horarios (`1971:225`): catálogo (crear, editar, "En línea", desactivar; con citas no se borra), horario, horarios por profesional, bloqueos.
+- Mi clínica (`1972:225`): perfil público con vista previa en vivo, reservas en línea, código/QR (regenerar, revocar) y datos legales.
+- Piezas compartidas nuevas: `vet-switch`, `vet-pager`, `vet-qr`, `vet-modal`, `vet-role-picker`, `ConfirmDialog` y los diálogos de servicio, bloqueo, horario y rol. El QR es una representación visual (no QR estándar) hasta conectar el backend.
+- Los diálogos de servicio, bloqueo, horario, cambiar rol y confirmación no tienen frame en Figma: usan el marco de los modales del diseño.

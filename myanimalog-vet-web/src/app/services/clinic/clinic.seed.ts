@@ -1,18 +1,10 @@
 import { addDays, at, dayMonth, startOfDay } from './date.utils';
-import { Appointment, AppointmentStatus, ClinicService, Patient, Professional, Species, VaccineState } from './clinic.models';
+import { Appointment, AppointmentStatus, Patient, Professional, Species, VaccineState } from './clinic.models';
 
 export const PROFESSIONALS: Professional[] = [
   { id: 'luis', name: 'Dr. Luis Pérez', initials: 'LP', role: 'Médico veterinario', color: '#F5A623', verified: true },
-  { id: 'sara', name: 'Dra. Sara Ruiz', initials: 'SR', role: 'Médica veterinaria', color: '#C9C6EE', verified: true },
-  { id: 'camila', name: 'Camila Mora', initials: 'CM', role: 'Peluquería', color: '#A8EBDD', verified: false },
-];
-
-export const SERVICES: ClinicService[] = [
-  { id: 's1', name: 'Consulta general', minutes: 30, professionalIds: ['luis', 'sara'] },
-  { id: 's2', name: 'Vacunación', minutes: 30, professionalIds: ['luis', 'sara'] },
-  { id: 's3', name: 'Control posoperatorio', minutes: 30, professionalIds: ['luis', 'sara'] },
-  { id: 's4', name: 'Desparasitación', minutes: 30, professionalIds: ['luis', 'sara'] },
-  { id: 's5', name: 'Baño y corte', minutes: 60, professionalIds: ['camila'] },
+  { id: 'sara', name: 'Dra. Sara Ruiz', initials: 'SR', role: 'Médica veterinaria', color: '#BDB8EE', verified: true },
+  { id: 'camila', name: 'Camila Mora', initials: 'CM', role: 'Peluquería', color: '#9FE3D6', verified: false },
 ];
 
 type Seed = [string, Species, string, string, string, string, string, string, number, VaccineState, boolean];

@@ -22,7 +22,7 @@ type Mode = 'menu' | 'link' | 'manual';
           <p class="lead">Elige cómo vincular a la mascota con tu clínica.</p>
           <button type="button" class="option" (click)="copyCode()">
             <mat-icon fontSet="material-icons-outlined">qr_code_2</mat-icon>
-            <span><strong>Código de vinculación</strong><small>El dueño lo escanea o lo escribe en la app: {{ store.linkCode }}</small></span>
+            <span><strong>Código de vinculación</strong><small>El dueño lo escanea o lo escribe en la app: {{ store.linkCode() ?? 'sin código activo' }}</small></span>
             <span class="chip">Copiar</span>
           </button>
           <button type="button" class="option" (click)="mode.set('link')">
@@ -101,8 +101,13 @@ export class AddPatientDialog {
   });
 
   protected copyCode(): void {
-    void navigator.clipboard?.writeText(this.store.linkCode).catch(() => undefined);
-    this.snack.open(`Código ${this.store.linkCode} copiado`, 'Cerrar', { duration: 3000 });
+    const code = this.store.linkCode();
+    if (!code) {
+      this.snack.open('No hay un código activo. Genera uno en Mi clínica.', 'Cerrar', { duration: 3000 });
+      return;
+    }
+    void navigator.clipboard?.writeText(code).catch(() => undefined);
+    this.snack.open(`Código ${code} copiado`, 'Cerrar', { duration: 3000 });
   }
 
   protected sendLink(): void {

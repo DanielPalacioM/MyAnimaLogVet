@@ -1,7 +1,7 @@
 import { computed, inject, Injectable } from '@angular/core';
 import { SessionService } from '@auth/services/session.service';
 import { ClinicStore } from '../clinic/clinic.store';
-import { cap, longDate } from '../clinic/date.utils';
+import { cap, longDate, timeAgo } from '../clinic/date.utils';
 
 /** Datos de la vista Inicio (saludo, agenda de hoy, pendientes y resumen de la clínica). */
 @Injectable({ providedIn: 'root' })
@@ -34,7 +34,14 @@ export class HomeService {
 
   readonly agenda = this.store.todayAppointments;
   readonly vaccinesToNotify = this.store.vaccinesToNotify;
-  readonly invitations = this.store.invitations;
+  /** Invitaciones al equipo que aún no se aceptan ("Sofía no ha aceptado…"). */
+  readonly invitations = computed(() =>
+    this.store.pendingInvitations().map((i) => ({
+      id: i.id,
+      name: cap(i.email.split('@')[0].split(/[._]/)[0]),
+      sentAgo: timeAgo(i.sentAt, this.store.now()),
+    })),
+  );
 
   /** Cuántas cosas hay por resolver (el número junto al título). */
   readonly pendingTotal = computed(

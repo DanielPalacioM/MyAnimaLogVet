@@ -1,0 +1,108 @@
+<div class="page">
+  <header class="head">
+    <h1>Clientes</h1>
+    <small class="total">{{ svc.counts().all }} vinculados</small>
+    <form class="search" role="search" (submit)="$event.preventDefault()">
+      <vet-icon name="search" [size]="16" />
+      <input type="search" [value]="svc.query()" (input)="setSearch($any($event.target).value)" placeholder="Busca por nombre, correo o teléfono" aria-label="Buscar cliente" />
+    </form>
+    <button type="button" class="vet-btn vet-btn--primary" (click)="showQr()"><vet-icon name="qr" [size]="16" />Mostrar código QR</button>
+  </header>
+
+  <div class="filters">
+    <div class="tabs" role="group" aria-label="Filtro">
+      @for (f of filters; track f.value) {
+        <button type="button" [class.on]="svc.filter() === f.value" [attr.aria-pressed]="svc.filter() === f.value" (click)="svc.setFilter(f.value)">
+          {{ f.label }} <small>{{ count(f.value) }}</small>
+        </button>
+      }
+    </div>
+    <button type="button" class="sort" [matMenuTriggerFor]="sortMenu">Ordenar por: <strong>{{ sortLabel() }}</strong></button>
+    <mat-menu #sortMenu="matMenu">
+      @for (s of sorts; track s.value) {
+        <button mat-menu-item (click)="svc.setSort(s.value)">{{ s.label }}</button>
+      }
+    </mat-menu>
+  </div>
+
+  <section class="table" aria-label="Lista de clientes">
+    <div class="row hdr" role="row">
+      <span>CLIENTE</span><span>TELÉFONO</span><span>MASCOTAS COMPARTIDAS</span><span>VINCULADO</span><span>ÚLTIMA VISITA</span><span>PRÓXIMA CITA</span><span></span>
+    </div>
+    @for (c of svc.pageRows(); track c.id) {
+      <button type="button" class="row item" (click)="svc.selectedId.set(c.id)" [attr.aria-label]="'Abrir ficha de ' + c.name">
+        <span class="pt">
+          <span class="av" [style.background]="tone(c).bg" [style.color]="tone(c).fg">{{ c.initials }}</span>
+          <span class="who"><strong>{{ c.name }}</strong><small>{{ c.email }}</small></span>
+        </span>
+        <span class="c"><span class="phone">{{ c.phone }}</span></span>
+        <span class="c pets">
+          @for (p of c.pets.slice(0, 2); track p.id) { <em class="chip">{{ p.name }}</em> }
+          @if (c.pets.length > 2) { <b class="more">+{{ c.pets.length - 2 }}</b> }
+        </span>
+        <span class="c"><strong>{{ linked(c) }}</strong><small>{{ via(c) }}</small></span>
+        <span class="c">
+          @if (c.lastVisitAt > 0) { <strong>{{ c.lastVisit }}</strong> } @else { <span class="none">Sin visitas</span> }
+        </span>
+        <span class="c">
+          @if (nextLabel(c); as n) { <strong [class.today]="n.today">{{ n.text }}</strong> } @else { <span class="none">Sin cita</span> }
+        </span>
+        <span class="go"><vet-icon name="right" [size]="16" /></span>
+      </button>
+    } @empty {
+      <div class="empty">
+        <p>No encontramos clientes con esos filtros.</p>
+        <button type="button" class="vet-btn vet-btn--secondary" (click)="svc.reset()">Quitar filtros</button>
+      </div>
+    }
+    <vet-pager [page]="svc.current()" [pageCount]="svc.pageCount()" [rangeLabel]="svc.rangeLabel()" (pageChange)="svc.page.set($event)" />
+  </section>
+
+  @if (svc.selected(); as c) {
+    <vet-side-sheet label="Ficha del cliente" (closed)="svc.selectedId.set(null)">
+      <div class="ss-hero">
+        <span class="ss-hero-av" [style.background]="tone(c).bg" [style.color]="tone(c).fg" style="font: 700 20px/1 'Afacad', sans-serif">{{ c.initials }}</span>
+        <div>
+          <h2>{{ c.name }}</h2>
+          <p style="color: #8a8a9a">Cliente desde el {{ since(c) }}</p>
+        </div>
+      </div>
+      <div class="ss-chips">
+        <span class="ss-tag" style="background: #f1f0fb; color: #4037be">{{ c.via === 'CLAIM' && c.claimedPet ? 'Vinculado al reclamar a ' + c.claimedPet : 'Vinculado con código QR' }}</span>
+      </div>
+      <div class="ss-contact">
+        <div>
+          <span><vet-icon name="phone" [size]="14" />{{ c.phone }}</span>
+          <span><vet-icon name="users" [size]="14" />{{ c.email }}</span>
+        </div>
+        <button type="button" class="ss-btn" (click)="call(c.phone)"><vet-icon name="phone" [size]="14" />Llamar</button>
+      </div>
+      <div class="ss-hr"></div>
+      <h3 class="ss-title">Mascotas compartidas · {{ c.pets.length }}</h3>
+      <div class="ss-pets">
+        @for (p of c.pets; track p.id) {
+          <button type="button" class="ss-pet" (click)="openPet(p.name)" [attr.aria-label]="'Ver a ' + p.name + ' en Pacientes'">
+            <span class="ss-pet-av"><vet-icon name="paw" [size]="16" /></span>
+            <span class="ss-pet-txt"><strong>{{ p.name }}</strong><small>{{ p.species }} · {{ p.breed }} · {{ p.age }}</small></span>
+            <span class="ss-tag" [style.color]="vaccine[p.vaccines].fg" [style.background]="vaccine[p.vaccines].bg"><i></i>{{ vaccine[p.vaccines].label }}</span>
+            <vet-icon name="right" [size]="16" />
+          </button>
+        }
+      </div>
+      <p class="ss-share" style="margin: 0"><vet-icon name="shield" [size]="14" />{{ firstName(c) }} decide qué mascotas comparte y puede quitar el acceso cuando quiera.</p>
+      <h3 class="ss-title">Citas</h3>
+      @for (h of history(c); track h.title) {
+        <div class="ss-visit">
+          <div><b [style.color]="h.upcoming ? '#4037be' : '#1a1a2e'">{{ h.date }}</b><small>{{ h.time }}</small></div>
+          <div><strong>{{ h.title }}</strong>@if (h.by) { <small>{{ h.by }}</small> }</div>
+        </div>
+      } @empty {
+        <p class="ss-hint" style="text-align: left">Todavía no tiene citas.</p>
+      }
+      <ng-container footer>
+        <button type="button" class="ss-primary" (click)="newAppointment(c)"><vet-icon name="plus" [size]="16" />Nueva cita</button>
+        <button type="button" class="ss-quit" (click)="remove(c)"><strong>Quitar cliente</strong><small>La clínica pierde el acceso a todas sus mascotas.</small></button>
+      </ng-container>
+    </vet-side-sheet>
+  }
+</div>

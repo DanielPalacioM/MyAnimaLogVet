@@ -1,0 +1,165 @@
+<div class="page">
+  <header class="head">
+    <h1>Equipo</h1>
+    <small class="total">{{ summary() }}</small>
+    <button type="button" class="vet-btn vet-btn--primary" (click)="invite()"><vet-icon name="plus" [size]="16" />Invitar</button>
+  </header>
+
+  <div class="filters">
+    <div class="tabs" role="group" aria-label="Filtro">
+      @for (f of filters; track f.value) {
+        <button type="button" [class.on]="svc.filter() === f.value" [attr.aria-pressed]="svc.filter() === f.value" (click)="svc.setFilter(f.value)">
+          {{ f.label }} <small>{{ count(f.value) }}</small>
+        </button>
+      }
+    </div>
+    <span class="plan">Plan PRO: <strong>usuarios sin límite</strong></span>
+  </div>
+
+  @if (svc.invitationRows().length) {
+    <section class="card" aria-label="Invitaciones">
+      <div class="card-head">
+        <h2>Invitaciones</h2>
+        @if (svc.pendingCount() > 0) { <span class="chip chip--warn">{{ svc.pendingCount() }} {{ svc.pendingCount() === 1 ? 'pendiente' : 'pendientes' }}</span> }
+      </div>
+      @for (r of svc.invitationRows(); track r.invitation.id) {
+        <div class="inv">
+          <span class="inv-who"><span class="at">@</span><strong>{{ r.invitation.email }}</strong></span>
+          <span><em class="chip chip--soft">{{ r.roleLabel }}</em></span>
+          <span class="by">{{ r.by }}</span>
+          <span>
+            @if (r.expired) { <em class="chip chip--gray"><i></i>Vencida</em> } @else { <strong class="expires">{{ r.expiresIn }}</strong> }
+          </span>
+          <span class="inv-actions">
+            <button type="button" class="link" (click)="resend(r.invitation.id, r.invitation.email)">Reenviar</button>
+            <button type="button" class="link link--gray" (click)="cancelInvitation(r.invitation.id, r.invitation.email)">Cancelar</button>
+          </span>
+        </div>
+      }
+    </section>
+  }
+
+  <section class="table" aria-label="Miembros del equipo">
+    <div class="row hdr" role="row">
+      <span>MIEMBRO</span><span>ROL</span><span>TARJETA PROFESIONAL</span><span>HISTORIA CLÍNICA</span><span>ESTADO</span><span>SE UNIÓ</span><span></span>
+    </div>
+    @for (m of svc.filtered(); track m.id) {
+      <div class="row item" [class.off]="!m.active" [class.sel]="svc.selectedId() === m.id">
+        <button type="button" class="open" (click)="svc.selectedId.set(m.id)" [attr.aria-label]="'Abrir ficha de ' + m.name"></button>
+        <span class="pt">
+          <span class="av" [style.background]="tone(m).bg" [style.color]="tone(m).fg">{{ initials(m) }}</span>
+          <span class="who">
+            <span class="name"><strong>{{ m.name }}</strong>@if (svc.isMe(m)) { <em>(tú)</em> }</span>
+            <small>{{ m.email }}</small>
+          </span>
+        </span>
+        <span>
+          <em class="chip" [class.chip--owner]="m.role === 'OWNER'" [class.chip--soft]="m.role !== 'OWNER'">{{ m.roleLabel }}</em>
+        </span>
+        <span>
+          @switch (m.license) {
+            @case ('VERIFIED') { <em class="chip chip--ok"><i></i>Verificada</em> }
+            @case ('IN_REVIEW') { <em class="chip chip--warn"><i></i>En revisión</em> }
+            @default { <span class="muted">No aplica</span> }
+          }
+        </span>
+        <span class="access access--{{ svc.clinicalAccess(m).tone }}">{{ svc.clinicalAccess(m).text }}</span>
+        <span>
+          @if (m.active) { <em class="chip chip--active"><i></i>Activo</em> } @else { <em class="chip chip--gray"><i></i>Inactivo</em> }
+        </span>
+        <span class="date">{{ joined(m) }}</span>
+        <span class="more">
+          <button type="button" class="dots" [matMenuTriggerFor]="rowMenu" [matMenuTriggerData]="{ member: m }" [attr.aria-label]="'Más acciones de ' + m.name">
+            <i></i><i></i><i></i>
+          </button>
+        </span>
+      </div>
+    }
+  </section>
+
+  <mat-menu #rowMenu="matMenu" xPosition="before">
+    <ng-template matMenuContent let-m="member">
+      <button mat-menu-item (click)="svc.selectedId.set(m.id)">Ver ficha</button>
+      @if (canManage(m)) {
+        <button mat-menu-item (click)="changeRole(m)">Cambiar rol</button>
+        @if (m.active) { <button mat-menu-item (click)="deactivate(m)">Desactivar</button> } @else { <button mat-menu-item (click)="activate(m)">Activar</button> }
+      }
+    </ng-template>
+  </mat-menu>
+
+  @if (svc.selected(); as m) {
+    <vet-side-sheet label="Ficha del miembro" (closed)="svc.selectedId.set(null)">
+      <div class="ss-hero">
+        <span class="ss-hero-av" [style.background]="tone(m).bg" [style.color]="tone(m).fg" style="font: 700 20px/1 'Afacad', sans-serif">{{ initials(m) }}</span>
+        <div>
+          <h2>{{ m.name }}</h2>
+          <p style="color: #8a8a9a">{{ m.email }} · se unió el {{ joined(m) }}</p>
+        </div>
+      </div>
+      <div class="ss-chips">
+        <span class="ss-tag" [style.background]="m.role === 'OWNER' ? '#4037be' : '#f1f0fb'" [style.color]="m.role === 'OWNER' ? '#fff' : '#4037be'">{{ m.roleLabel }}</span>
+        @if (m.active) { <span class="ss-tag" style="background: #e8f5e9; color: #2e7d32"><i></i>Activo</span> } @else { <span class="ss-tag" style="background: #f0f0f3; color: #6b6b80"><i></i>Inactivo</span> }
+      </div>
+
+      @if (m.license === 'IN_REVIEW') {
+        <div class="ss-alert">
+          <vet-icon name="note" [size]="16" />
+          <div>
+            <b>Aún no puede escribir historia clínica</b>
+            <span>Su tarjeta profesional está en revisión por el equipo de MyAnimaLog. Mientras tanto puede atender la agenda y leer la historia.</span>
+          </div>
+        </div>
+      }
+
+      @if (m.profession) {
+        <h3 class="ss-title">Perfil profesional</h3>
+        <div class="ss-card">
+          <div class="ss-kv"><span>Profesión</span><b>{{ m.profession }}</b></div>
+          <div class="ss-kv"><span>Tarjeta profesional</span><b>{{ m.card }}</b></div>
+          @if (m.specialty) { <div class="ss-kv"><span>Especialidad</span><b>{{ m.specialty }}</b></div> }
+          @if (m.university) { <div class="ss-kv"><span>Universidad</span><b>{{ m.university }}</b></div> }
+          <div class="ss-kv">
+            <span>Verificación</span>
+            @if (m.license === 'VERIFIED') { <em class="ss-tag" style="background: #e0fffa; color: #00796b"><i></i>Verificada</em> }
+            @else { <em class="ss-tag" style="background: #fff4e0; color: #b26a00"><i></i>En revisión</em><small style="color: #8a8a9a">enviada el {{ m.cardSentAt }}</small> }
+          </div>
+        </div>
+      }
+
+      <h3 class="ss-title">Qué puede hacer</h3>
+      <div class="ss-perms">
+        @for (p of svc.permissions(m); track p.text) {
+          @if (p.pending) {
+            <div class="ss-perm ss-perm--pending"><i></i>{{ p.text }}</div>
+          } @else {
+            <div class="ss-perm"><vet-icon name="check" [size]="14" />{{ p.text }}</div>
+          }
+        }
+      </div>
+
+      @if (m.schedule !== '—') {
+        <div class="ss-schedule">
+          <vet-icon name="clock" [size]="16" />
+          <div><strong>{{ m.schedule }}</strong><small>Se edita en Servicios y horarios</small></div>
+          <button type="button" class="ss-link" (click)="goSchedule()" aria-label="Ir a Servicios y horarios"><vet-icon name="arrow" [size]="14" /></button>
+        </div>
+      }
+
+      <ng-container footer>
+        @if (canManage(m)) {
+          <div class="ss-two">
+            <button type="button" (click)="changeRole(m)">Cambiar rol</button>
+            <button type="button" (click)="transfer(m)">Transferir propiedad</button>
+          </div>
+          @if (m.active) {
+            <button type="button" class="ss-quit" (click)="deactivate(m)"><strong>Desactivar</strong><small>Pierde el acceso a la clínica en máximo 15 minutos.</small></button>
+          } @else {
+            <button type="button" class="ss-primary" (click)="activate(m)">Activar de nuevo</button>
+          }
+        } @else if (m.role === 'OWNER') {
+          <p class="ss-hint">La propiedad se transfiere desde la ficha de otra persona del equipo.</p>
+        }
+      </ng-container>
+    </vet-side-sheet>
+  }
+</div>

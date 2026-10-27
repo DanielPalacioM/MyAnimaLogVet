@@ -1,11 +1,11 @@
 <div class="pac">
   <header class="head">
-    <h1>Pacientes <small>{{ svc.total() }} en total</small></h1>
+    <h1>Pacientes</h1><small class="total">{{ svc.total() }} en total</small>
     <form class="search" role="search" (submit)="$event.preventDefault()">
-      <mat-icon fontSet="material-icons-outlined" aria-hidden="true">search</mat-icon>
+      <vet-icon name="search" [size]="16" />
       <input type="search" [value]="svc.query()" (input)="onSearch($any($event.target).value)" placeholder="Busca por mascota, dueño o teléfono" aria-label="Buscar paciente" />
     </form>
-    <button type="button" class="vet-btn vet-btn--primary" (click)="add()"><mat-icon fontSet="material-icons-outlined" aria-hidden="true">add</mat-icon>Agregar paciente</button>
+    <button type="button" class="vet-btn vet-btn--primary" (click)="add()"><vet-icon name="plus" [size]="16" />Agregar paciente</button>
   </header>
 
   <div class="filters">
@@ -34,7 +34,7 @@
     @for (r of svc.pageRows(); track r.patient.id) {
       <button type="button" class="row item" (click)="svc.selectedId.set(r.patient.id)" [attr.aria-label]="'Abrir ficha de ' + r.patient.name">
         <span class="pt">
-          <span class="av"><mat-icon fontSet="material-icons-outlined" aria-hidden="true">pets</mat-icon></span>
+          <span class="av"><vet-icon name="paw" [size]="18" /></span>
           <span><strong>{{ r.patient.name }}</strong><small>{{ r.patient.species }} · {{ r.patient.breed }} · {{ r.patient.age }}</small></span>
         </span>
         <span class="c"><strong>{{ r.patient.owner }}</strong><small>{{ r.patient.phone }}</small></span>
@@ -46,9 +46,9 @@
             <small class="none">Sin cita</small>
           }
         </span>
-        <span class="c"><em class="tag" [style.color]="vaccine[r.patient.vaccines].fg" [style.background]="vaccine[r.patient.vaccines].bg">{{ vaccine[r.patient.vaccines].label }}</em></span>
+        <span class="c"><em class="tag" [style.color]="vaccine[r.patient.vaccines].fg" [style.background]="vaccine[r.patient.vaccines].bg"><i class="tdot"></i>{{ vaccine[r.patient.vaccines].label }}</em></span>
         <span class="c"><em class="tag" [class.app]="r.patient.inApp" [class.claim]="!r.patient.inApp">{{ r.patient.inApp ? 'Conectado' : 'Por reclamar' }}</em></span>
-        <span class="go"><mat-icon fontSet="material-icons-outlined" aria-hidden="true">chevron_right</mat-icon></span>
+        <span class="go"><vet-icon name="right" [size]="16" /></span>
       </button>
     } @empty {
       <div class="empty">
@@ -59,45 +59,84 @@
     <footer>
       <span>{{ svc.rangeLabel() }}</span>
       <nav class="pages" aria-label="Páginas">
-        <button type="button" class="pg" [disabled]="svc.current() === 1" (click)="goTo(svc.current() - 1)" aria-label="Página anterior"><mat-icon fontSet="material-icons-outlined">chevron_left</mat-icon></button>
+        <button type="button" class="pg" [disabled]="svc.current() === 1" (click)="goTo(svc.current() - 1)" aria-label="Página anterior"><vet-icon name="left" [size]="14" /></button>
         @for (p of svc.pages(); track $index) {
           <button type="button" class="pg" [class.on]="p === svc.current()" [disabled]="p === '…'" [attr.aria-current]="p === svc.current() ? 'page' : null" (click)="goTo(p)">{{ p }}</button>
         }
-        <button type="button" class="pg" [disabled]="svc.current() === svc.pageCount()" (click)="goTo(svc.current() + 1)" aria-label="Página siguiente"><mat-icon fontSet="material-icons-outlined">chevron_right</mat-icon></button>
+        <button type="button" class="pg" [disabled]="svc.current() === svc.pageCount()" (click)="goTo(svc.current() + 1)" aria-label="Página siguiente"><vet-icon name="right" [size]="14" /></button>
       </nav>
     </footer>
   </section>
 
   @if (svc.selected(); as p) {
-    <div class="backdrop" (click)="svc.selectedId.set(null)"></div>
-    <aside class="drawer" role="dialog" [attr.aria-label]="'Ficha de ' + p.name">
-      <header>
-        <h2>{{ p.name }}</h2>
-        <button type="button" class="ic" (click)="svc.selectedId.set(null)" aria-label="Cerrar ficha"><mat-icon fontSet="material-icons-outlined">close</mat-icon></button>
-      </header>
-      <p class="sub">{{ p.species }} · {{ p.breed }} · {{ p.age }}</p>
-      <div class="tags">
-        <em class="tag" [style.color]="vaccine[p.vaccines].fg" [style.background]="vaccine[p.vaccines].bg">Vacunas: {{ vaccine[p.vaccines].label }}</em>
-        <em class="tag" [class.app]="p.inApp" [class.claim]="!p.inApp">{{ p.inApp ? 'Conectado a la app' : 'Por reclamar' }}</em>
-      </div>
-      <dl>
-        <div><dt>Dueño</dt><dd>{{ p.owner }}<br />{{ p.phone }}</dd></div>
-        <div><dt>Última visita</dt><dd>{{ p.lastVisit }} · {{ p.lastVisitService }}</dd></div>
+    @let x = extras(p);
+    @let next = svc.nextAppointmentsOf(p.id)[0];
+    <vet-side-sheet label="Ficha del paciente" (closed)="svc.selectedId.set(null)">
+      <div class="ss-hero">
+        <span class="ss-hero-av"><vet-icon name="paw" [size]="26" /></span>
         <div>
-          <dt>Próximas citas</dt>
-          @for (a of svc.nextAppointmentsOf(p.id); track a.id) {
-            <dd>{{ dateLabel(a.start) }} · {{ timeOf(a) }} <small>({{ statusLabel[a.status] }})</small></dd>
-          } @empty {
-            <dd>Sin citas programadas</dd>
-          }
+          <h2>{{ p.name }}</h2>
+          <p>{{ p.breed }} · {{ x.sex }} · {{ p.age }} · {{ x.weightKg }} kg</p>
         </div>
-      </dl>
-      <div class="actions">
-        <button type="button" class="vet-btn vet-btn--primary" (click)="newAppointment(p.id)">Nueva cita</button>
-        @if (!p.inApp) {
-          <button type="button" class="vet-btn vet-btn--secondary" (click)="claimLink(p.owner)">Enviar enlace para reclamar</button>
+      </div>
+      <div class="ss-chips">
+        <span class="ss-chip" [style.color]="vaccine[p.vaccines].fg" [style.background]="vaccine[p.vaccines].bg">{{ vaccine[p.vaccines].sheet }}</span>
+        <span class="ss-chip" [style.color]="p.inApp ? '#4037be' : '#b26a00'" [style.background]="p.inApp ? '#f1f0fb' : '#fff4e0'">{{ p.inApp ? 'Conectado a la app' : 'Por reclamar' }}</span>
+      </div>
+      <div class="ss-row">
+        <span class="ss-tile"><vet-icon name="cal" [size]="16" /></span>
+        @if (next) {
+          <div><strong>Próxima cita: {{ nextWhen(next) }}</strong><small>{{ next.service }} · {{ professionalName(next) }}</small></div>
+        } @else {
+          <div><strong>Sin cita programada</strong><small>Agenda una desde “Nueva cita”</small></div>
         }
       </div>
-    </aside>
+      <div class="ss-row">
+        <span class="ss-tile"><vet-icon name="badge" [size]="16" /></span>
+        <div>
+          <strong>Paciente desde el {{ x.since }}</strong>
+          <small>{{ p.inApp ? x.sharedBy + ' lo compartió desde la app' : 'Registrado por la clínica' }}</small>
+        </div>
+      </div>
+      <div class="ss-row">
+        <span class="ss-tile"><vet-icon name="tag" [size]="16" /></span>
+        <div><strong>Microchip {{ x.microchip }}</strong><small>{{ x.weightKg }} kg · última visita {{ p.lastVisit }}</small></div>
+      </div>
+      <div class="ss-hr"></div>
+      <div class="ss-owner">
+        <div>
+          <small>DUEÑO</small>
+          <strong>{{ p.owner }}</strong>
+          <span class="ss-phone"><vet-icon name="phone" [size]="13" />{{ p.phone }}</span>
+        </div>
+        <a class="ss-btn" [href]="'tel:' + p.phone.replaceAll(' ', '')"><vet-icon name="phone" [size]="14" />Llamar</a>
+      </div>
+      @if (p.inApp) {
+        <p class="ss-share" style="margin: 0"><vet-icon name="shield" [size]="14" />Comparte la historia de {{ p.name }} con la clínica</p>
+      } @else {
+        <button type="button" class="ss-link" (click)="claimLink(p.owner)">Enviar enlace para reclamar</button>
+      }
+      @if (x.alert) {
+        <div class="ss-note ss-note--alert">
+          <vet-icon name="note" [size]="16" />
+          <div><b>ALERTA CLÍNICA</b><span>{{ x.alert }}</span></div>
+        </div>
+      }
+      <div class="ss-hist-h">
+        <h3>Historial reciente</h3>
+        <button type="button" class="ss-link" (click)="soon()">Ver historia completa <vet-icon name="arrow" [size]="14" /></button>
+      </div>
+      @for (e of x.history; track e.title) {
+        <div class="ss-hist"><time>{{ e.date }}</time><div><strong>{{ e.title }}</strong><small>{{ e.by }}</small></div></div>
+      }
+      <ng-container footer>
+        <button type="button" class="ss-primary" (click)="registerVisit(p.name)"><vet-icon name="plus" [size]="16" />Registrar visita</button>
+        <div class="ss-two">
+          <button type="button" (click)="newAppointment(p.id)">Nueva cita</button>
+          <button type="button" (click)="uploadDoc()">Subir documento</button>
+        </div>
+        <p class="ss-hint">Solo veterinarios con tarjeta verificada pueden registrar visitas.</p>
+      </ng-container>
+    </vet-side-sheet>
   }
 </div>

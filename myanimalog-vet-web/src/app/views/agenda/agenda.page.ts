@@ -1,11 +1,14 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { AGENDA_END_HOUR, AGENDA_START_HOUR, AgendaService, HOUR_PX, LUNCH } from '@services/agenda/agenda.service';
-import { Appointment, AppointmentStatus, STATUS_COLOR } from '@services/clinic/clinic.models';
+import { Appointment, AppointmentStatus, STATUS_COLOR, STATUS_LABEL } from '@services/clinic/clinic.models';
 import { ClinicStore } from '@services/clinic/clinic.store';
 import { cap, longDate, monthName, sameDay, startOfDay, timeLabel } from '@services/clinic/date.utils';
+import { Router } from '@angular/router';
+import { SERVICE_PRICE, money, patientExtras } from '@services/clinic/patient-details';
 import { PanelActionsService } from '@services/panel/panel-actions.service';
 
 interface MonthCell {
+  /** 0 = hueco antes del día 1. */
   day: number;
   label: number;
   inMonth: boolean;
@@ -30,6 +33,7 @@ export class AgendaPage {
   protected readonly agenda = inject(AgendaService);
   protected readonly store = inject(ClinicStore);
   private readonly actions = inject(PanelActionsService);
+  private readonly router = inject(Router);
 
   protected readonly weekdays = WEEKDAYS;
   protected readonly weekdayNames = WEEKDAY_NAMES;
@@ -45,6 +49,7 @@ export class AgendaPage {
     { status: 'NO_SHOW', label: 'No asistió' },
   ];
   protected readonly colors = STATUS_COLOR;
+  protected readonly statusLabel = STATUS_LABEL;
 
   protected readonly title = computed(() => longDate(this.agenda.day()));
   protected readonly monthTitle = computed(() => {
@@ -64,11 +69,12 @@ export class AgendaPage {
     const offset = (first.getDay() + 6) % 7;
     const dots = this.agenda.daysWithAppointments();
     const out: MonthCell[] = [];
-    for (let i = 0; i < 42; i++) {
+    for (let i = 0; i < offset; i++) out.push({ day: 0, label: 0, inMonth: false, dot: false, today: false, selected: false, weekend: false });
+    for (let i = offset; i < 42; i++) {
       const d = new Date(first);
       d.setDate(1 - offset + i);
       const ms = startOfDay(d.getTime());
-      if (i >= 35 && d.getMonth() !== first.getMonth()) break;
+      if (d.getMonth() !== first.getMonth()) break;
       out.push({
         day: ms,
         label: d.getDate(),
@@ -121,6 +127,14 @@ export class AgendaPage {
     return `${f(a.start)} – ${f(a.start + a.minutes * 60_000)}`;
   }
 
+  /** "Mar 7 oct · 9:00 a. m. · Dr. Luis" */
+  protected requestWhen(a: Appointment): string {
+    const d = new Date(a.start);
+    const dow = WEEKDAY_NAMES[(d.getDay() + 6) % 7];
+    const who = (this.store.professional(a.professionalId)?.name ?? '').split(' ').slice(0, 2).join(' ');
+    return `${dow} ${d.getDate()} ${monthName(d.getMonth()).slice(0, 3)} · ${timeLabel(a.start)} · ${who}`;
+  }
+
   protected dayLabel(ms: number): { name: string; num: number } {
     const d = new Date(ms);
     return { name: WEEKDAY_NAMES[(d.getDay() + 6) % 7], num: d.getDate() };
@@ -171,6 +185,31 @@ export class AgendaPage {
 
   protected reject(a: Appointment): void {
     this.change(a, 'CANCELLED', `Solicitud de ${a.patientName} rechazada`);
+  }
+
+  protected extras = patientExtras;
+
+  protected price(service: string): string {
+    return money(SERVICE_PRICE[service] ?? 50_000);
+  }
+
+  protected minutesUntil(a: Appointment): number {
+    return Math.max(0, Math.round((a.start - this.store.now()) / 60_000));
+  }
+
+  /** "a. m." / "p. m." del fin de la cita. */
+  protected suffix(a: Appointment): string {
+    return timeLabel(a.start + a.minutes * 60_000).includes('p. m.') ? 'p. m.' : 'a. m.';
+  }
+
+  protected seeFile(name: string): void {
+    this.close();
+    void this.router.navigate(['/pacientes'], { queryParams: { q: name } });
+  }
+
+  protected reschedule(a: Appointment): void {
+    this.close();
+    this.actions.newAppointment({ patientId: a.patientId });
   }
 
   protected call(phone: string): void {

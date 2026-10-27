@@ -1,0 +1,172 @@
+<form class="page" [formGroup]="form" (ngSubmit)="save()" novalidate>
+  <header class="head">
+    <h1>Mi clínica</h1>
+    @if (verified()) {
+      <span class="seal"><svg width="10" height="9" viewBox="0 0 10 9" fill="none" aria-hidden="true"><path d="M1 4.6 3.8 7.4 9 1.5" stroke="#1a1a2e" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>Clínica verificada</span>
+    } @else {
+      <span class="pending">En revisión</span>
+    }
+    <span class="grow"></span>
+    <button type="button" class="btn btn--soft" (click)="seeAsOwner()">Ver como dueño</button>
+    <button type="submit" class="vet-btn vet-btn--primary">Guardar cambios</button>
+  </header>
+
+  <div class="body">
+    <div class="col">
+      <section class="card" aria-labelledby="pp-title">
+        <div class="card-head">
+          <h2 id="pp-title">Perfil público</h2>
+          @if (values().inDirectory) { <span class="chip chip--ok"><i></i>Visible en el directorio</span> } @else { <span class="chip chip--gray"><i></i>Oculta del directorio</span> }
+        </div>
+        <div class="card-body">
+          <div class="logo-row">
+            <span class="logo" [style.background-image]="logo() ? 'url(' + logo() + ')' : null">@if (!logo()) { {{ initial() }} }</span>
+            <div class="logo-txt">
+              <strong>Logo</strong>
+              <small>PNG, JPG o WEBP · máximo 2 MB. Se ve en la app y en el directorio.</small>
+              @if (logoError()) { <small class="err" role="alert">{{ logoError() }}</small> }
+            </div>
+            <label class="btn btn--sm">
+              Cambiar
+              <input type="file" accept="image/png,image/jpeg,image/webp" (change)="pickLogo($event)" hidden />
+            </label>
+            <button type="button" class="quiet" (click)="removeLogo()" [disabled]="!logo()">Quitar</button>
+          </div>
+
+          <div class="grid">
+            <div class="f">
+              <label for="mc-name">Nombre comercial</label>
+              <input id="mc-name" class="box" formControlName="name" autocomplete="organization" [attr.aria-invalid]="err('name') ? 'true' : null" />
+              @if (err('name'); as e) { <small class="err" role="alert">{{ e }}</small> }
+            </div>
+            <div class="f">
+              <label for="mc-phone">Teléfono</label>
+              <input id="mc-phone" class="box" type="tel" formControlName="phone" autocomplete="tel" [attr.aria-invalid]="err('phone') ? 'true' : null" />
+              @if (err('phone'); as e) { <small class="err" role="alert">{{ e }}</small> }
+            </div>
+            <div class="f">
+              <label for="mc-email">Correo de contacto</label>
+              <input id="mc-email" class="box" type="email" formControlName="email" autocomplete="email" [attr.aria-invalid]="err('email') ? 'true' : null" />
+              @if (err('email'); as e) { <small class="err" role="alert">{{ e }}</small> }
+            </div>
+            <div class="f">
+              <label for="mc-city">Ciudad</label>
+              <select id="mc-city" class="box box--select" formControlName="city">
+                @for (c of cities; track c) { <option [value]="c">{{ c }}</option> }
+              </select>
+            </div>
+            <div class="f f--wide">
+              <label for="mc-address">Dirección</label>
+              <input id="mc-address" class="box" formControlName="address" autocomplete="street-address" [attr.aria-invalid]="err('address') ? 'true' : null" />
+              @if (err('address'); as e) { <small class="err" role="alert">{{ e }}</small> }
+            </div>
+          </div>
+
+          <div #map class="map" (pointermove)="movePin($event, map)" (pointerdown)="movePin($event, map)" role="img" aria-label="Mapa con la ubicación de la clínica">
+            <i class="road road--h1"></i><i class="road road--h2"></i><i class="road road--v1"></i><i class="road road--v2"></i><i class="water"></i>
+            <i class="pin" [style.left.%]="pin().x" [style.top.%]="pin().y"></i>
+            <span class="map-help">Arrastra el pin si la ubicación no es exacta</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="rl-title">
+        <div class="card-head">
+          <h2 id="rl-title">Reservas en línea</h2>
+          <span class="hint">Aplica a las citas pedidas desde la app</span>
+        </div>
+        <div class="set">
+          <span><strong>Permitir reservas desde la app</strong><small>Los dueños vinculados ven tus servicios en línea y piden cita.</small></span>
+          <vet-switch [checked]="values().onlineBooking ?? false" (checkedChange)="set('onlineBooking', $event)" label="Permitir reservas desde la app" />
+        </div>
+        <div class="set">
+          <span><strong>Confirmar cada solicitud</strong><small>Si lo apagas, las citas pedidas desde la app quedan confirmadas al instante.</small></span>
+          <vet-switch [checked]="values().confirmEach ?? false" (checkedChange)="set('confirmEach', $event)" label="Confirmar cada solicitud" />
+        </div>
+        <div class="set">
+          <span><strong>Cancelación con anticipación mínima</strong><small>Con menos tiempo, el dueño no puede cancelar desde la app.</small></span>
+          <select class="sel" formControlName="minCancelHours" aria-label="Anticipación mínima para cancelar">
+            @for (h of cancelOptions; track h) { <option [ngValue]="h">{{ h }} {{ h === 1 ? 'hora' : 'horas' }}</option> }
+          </select>
+        </div>
+        <div class="set">
+          <span><strong>Duración de una cita por defecto</strong><small>Se usa cuando un servicio no tiene duración propia.</small></span>
+          <select class="sel" formControlName="defaultMinutes" aria-label="Duración de una cita por defecto">
+            @for (m of durations; track m) { <option [ngValue]="m">{{ m }} min</option> }
+          </select>
+        </div>
+        <div class="set set--last">
+          <span><strong>Aparecer en el directorio</strong><small>Solo las clínicas verificadas aparecen en la búsqueda de la app.</small></span>
+          <vet-switch [checked]="values().inDirectory ?? false" (checkedChange)="set('inDirectory', $event)" [disabled]="!verified()" label="Aparecer en el directorio" />
+        </div>
+      </section>
+    </div>
+
+    <div class="col col--side">
+      <section class="card" aria-labelledby="lc-title">
+        <div class="card-head">
+          <h2 id="lc-title">Código de vinculación</h2>
+          <span class="chip chip--soft">{{ svc.clientsCount() }} clientes</span>
+        </div>
+        <div class="code">
+          @if (store.linkCode(); as code) {
+            <vet-qr [value]="code" />
+            <strong class="code-text">{{ code }}</strong>
+            <p>Muéstralo en recepción: el dueño lo escanea desde MyAnimaLog y elige qué mascotas compartir.</p>
+            <div class="code-btns">
+              <button type="button" class="btn btn--primary" (click)="download(code)">Descargar QR</button>
+              <button type="button" class="btn btn--soft" (click)="regenerate()">Regenerar</button>
+            </div>
+          } @else {
+            <p class="no-code">No hay un código activo: ningún dueño nuevo puede vincularse.</p>
+            <button type="button" class="btn btn--primary" (click)="regenerate()">Generar código</button>
+          }
+        </div>
+        @if (store.linkCode()) {
+          <div class="revoke">
+            <button type="button" (click)="revoke()"><strong>Revocar código</strong></button>
+            <small>El código actual deja de servir. Los clientes ya vinculados se quedan.</small>
+          </div>
+        }
+      </section>
+
+      <section #preview class="card" [class.flash]="highlight()" aria-labelledby="pv-title">
+        <div class="card-head">
+          <h2 id="pv-title">Así te ven en la app</h2>
+          <span class="hint">Vista previa</span>
+        </div>
+        <div class="app-bg">
+          <div class="app-card">
+            <div class="app-top">
+              <span class="app-logo" [style.background-image]="logo() ? 'url(' + logo() + ')' : null">@if (!logo()) { {{ initial() }} }</span>
+              <div class="app-name">
+                <span>{{ values().name }}</span>
+                <span class="app-meta">
+                  @if (verified()) { <em class="mini"><svg width="8" height="7" viewBox="0 0 10 9" fill="none" aria-hidden="true"><path d="M1 4.6 3.8 7.4 9 1.5" stroke="#1a1a2e" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>Verificada</em> }
+                  <small>{{ cityShort() }} · a 1,2 km</small>
+                </span>
+              </div>
+            </div>
+            <span class="app-open" [class.app-open--closed]="!svc.openNow().open">● {{ svc.openNow().text }}</span>
+            <div class="app-chips">
+              @for (c of visibleCategories(); track c) { <em class="chip chip--soft">{{ c }}</em> }
+              @if (extraCategories() > 0) { <em class="chip chip--soft">+{{ extraCategories() }}</em> }
+            </div>
+            <span class="app-cta" [class.app-cta--off]="!values().onlineBooking">{{ values().onlineBooking ? 'Pedir cita' : 'Reservas en línea apagadas' }}</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="dl-title">
+        <div class="card-head">
+          <h2 id="dl-title">Datos legales</h2>
+          <span class="chip chip--teal"><i></i>Verificados</span>
+        </div>
+        <div class="kv"><span>Razón social</span><strong>{{ svc.legal.businessName }}</strong></div>
+        <div class="kv"><span>NIT</span><strong>{{ svc.legal.nit }}</strong></div>
+        <div class="kv"><span>Representante legal</span><strong>{{ svc.legal.legalRep }}</strong></div>
+        <p class="legal-note">Estos datos pasaron la verificación. Para cambiarlos escribe a soporte: el cambio requiere una nueva revisión.</p>
+      </section>
+    </div>
+  </div>
+</form>

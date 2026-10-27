@@ -6,7 +6,8 @@ import { hourParts } from '@services/clinic/date.utils';
 import { HomeService } from '@services/home/home.service';
 import { PanelActionsService } from '@services/panel/panel-actions.service';
 
-const AVATAR = ['#FFE9C7', '#E3E1F6', '#D9F5EF', '#FBE1E1'];
+const AVATAR = ['#FFE2B8', '#E3E1F6', '#D9F5EF', '#FCE3E3'];
+const AVATAR_BY_NAME: Record<string, string> = { Max: '#FFE2B8', Luna: '#E3E1F6', 'Simón': '#E3E1F6', Toby: '#D9F5EF', Kira: '#FCE3E3' };
 
 /** Inicio (Figma 1932:159): saludo, agenda de hoy, por resolver, acciones rápidas y resumen de la clínica. */
 @Component({
@@ -40,8 +41,8 @@ export class HomePage {
     return hourParts(a.start);
   }
 
-  protected avatar(index: number): string {
-    return AVATAR[index % AVATAR.length];
+  protected avatar(a: Appointment, index: number): string {
+    return AVATAR_BY_NAME[a.patientName] ?? AVATAR[index % AVATAR.length];
   }
 
   protected breed(a: Appointment): string {

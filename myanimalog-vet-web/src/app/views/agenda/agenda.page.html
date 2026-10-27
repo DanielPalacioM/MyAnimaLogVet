@@ -2,16 +2,16 @@
   <header class="head">
     <h1>Agenda</h1>
     <div class="nav">
-      <button type="button" class="sq" (click)="agenda.step(-1)" aria-label="Anterior"><mat-icon fontSet="material-icons-outlined">chevron_left</mat-icon></button>
+      <button type="button" class="sq" (click)="agenda.step(-1)" aria-label="Anterior"><vet-icon name="left" [size]="16" /></button>
       <button type="button" class="sq today" (click)="agenda.today()">Hoy</button>
-      <button type="button" class="sq" (click)="agenda.step(1)" aria-label="Siguiente"><mat-icon fontSet="material-icons-outlined">chevron_right</mat-icon></button>
+      <button type="button" class="sq" (click)="agenda.step(1)" aria-label="Siguiente"><vet-icon name="right" [size]="16" /></button>
       <span class="when" aria-live="polite">{{ agenda.view() === 'week' ? weekTitle() : title() }}</span>
     </div>
     <div class="seg" role="group" aria-label="Vista">
       <button type="button" [class.on]="agenda.view() === 'day'" [attr.aria-pressed]="agenda.view() === 'day'" (click)="agenda.view.set('day')">Día</button>
       <button type="button" [class.on]="agenda.view() === 'week'" [attr.aria-pressed]="agenda.view() === 'week'" (click)="agenda.view.set('week')">Semana</button>
     </div>
-    <button type="button" class="vet-btn vet-btn--primary" (click)="newAppointment()"><mat-icon fontSet="material-icons-outlined" aria-hidden="true">add</mat-icon>Nueva cita</button>
+    <button type="button" class="vet-btn vet-btn--primary" (click)="newAppointment()"><vet-icon name="plus" [size]="16" />Nueva cita</button>
   </header>
 
   <div class="body">
@@ -20,16 +20,18 @@
         <header>
           <strong>{{ monthTitle() }}</strong>
           <span>
-            <button type="button" class="ic" (click)="agenda.stepMonth(-1)" aria-label="Mes anterior"><mat-icon fontSet="material-icons-outlined">chevron_left</mat-icon></button>
-            <button type="button" class="ic" (click)="agenda.stepMonth(1)" aria-label="Mes siguiente"><mat-icon fontSet="material-icons-outlined">chevron_right</mat-icon></button>
+            <button type="button" class="ic" (click)="agenda.stepMonth(-1)" aria-label="Mes anterior"><vet-icon name="left" [size]="14" /></button>
+            <button type="button" class="ic" (click)="agenda.stepMonth(1)" aria-label="Mes siguiente"><vet-icon name="right" [size]="14" /></button>
           </span>
         </header>
         <div class="weekdays" aria-hidden="true">@for (w of weekdays; track $index) { <span>{{ w }}</span> }</div>
         <div class="days">
-          @for (c of cells(); track c.day) {
+          @for (c of cells(); track $index) {
+            @if (c.label === 0) { <span></span> } @else {
             <button type="button" [class.out]="!c.inMonth" [class.wk]="c.weekend" [class.sel]="c.selected" [class.today]="c.today" (click)="pick(c.day)" [attr.aria-label]="c.label + (c.dot ? ', con citas' : '')" [attr.aria-pressed]="c.selected">
               {{ c.label }}@if (c.dot) { <i></i> }
             </button>
+            }
           }
         </div>
       </section>
@@ -38,8 +40,8 @@
         <h2 id="req-title">Solicitudes de la app <span class="count">{{ agenda.requests().length }}</span></h2>
         @for (r of agenda.requests(); track r.id) {
           <article class="req">
-            <p><strong>{{ r.patientName }}</strong> {{ r.service }}</p>
-            <small>{{ time(r.start) }} · {{ professional(r.professionalId)?.name }}</small>
+            <p><strong>{{ r.patientName }}</strong><span>{{ r.service }}</span></p>
+            <small>{{ requestWhen(r) }}</small>
             <div class="acts">
               <button type="button" class="vet-btn vet-btn--primary mini" (click)="accept(r)">Aceptar</button>
               <button type="button" class="vet-btn vet-btn--secondary mini" (click)="reject(r)">Rechazar</button>
@@ -67,7 +69,7 @@
               <span class="pav" [style.background]="p.color">{{ p.initials }}</span>
               <span>
                 <strong>{{ p.name }}</strong>
-                <small>@if (p.verified) { <mat-icon fontSet="material-icons-outlined" aria-hidden="true">verified_user</mat-icon> }{{ p.role }} · {{ agenda.activeCountFor(p.id) }} citas</small>
+                <small>@if (p.verified) { <vet-icon name="shield" [size]="12" /> }{{ p.role }} · {{ agenda.activeCountFor(p.id) }} citas</small>
               </span>
             </div>
           }
@@ -100,12 +102,15 @@
                     >
                       @if (isTall(a)) {
                         <small class="range" [style.color]="colors[a.status].fg">{{ range(a) }}</small>
-                        <span><strong [class.strike]="a.status === 'NO_SHOW'">{{ a.patientName }}</strong></span>
-                        <small>{{ a.service }}</small>
+                        <span class="who">
+                          @if (p.role === 'Peluquería') { <vet-icon name="scissors" [size]="12" /> }
+                          <strong [class.strike]="a.status === 'NO_SHOW'">{{ a.patientName }}</strong>
+                        </span>
+                        <small class="svc2">{{ a.service }}</small>
                       } @else {
                         <strong [class.strike]="a.status === 'NO_SHOW'">{{ a.patientName }}</strong>
                         <span class="svc">{{ a.service }}</span>
-                        <vet-status-chip [status]="a.id === agenda.nextId() ? 'CONFIRMED' : a.status" />
+                        <span class="pill" [style.color]="colors[a.status].fg">{{ a.id === agenda.nextId() ? 'Próxima' : statusLabel[a.status] }}</span>
                       }
                     </button>
                   }
@@ -139,38 +144,82 @@
   </div>
 
   @if (agenda.selected(); as a) {
-    <div class="backdrop" (click)="close()"></div>
-    <aside class="drawer" role="dialog" aria-label="Detalle de la cita">
-      <header>
-        <h2>{{ a.patientName }}</h2>
-        <button type="button" class="ic" (click)="close()" aria-label="Cerrar detalle"><mat-icon fontSet="material-icons-outlined">close</mat-icon></button>
-      </header>
-      <vet-status-chip [status]="a.status" />
-      <dl>
-        <div><dt>Mascota</dt><dd>{{ patient(a)?.species }} · {{ patient(a)?.breed }} · {{ patient(a)?.age }}</dd></div>
-        <div><dt>Fecha</dt><dd>{{ dateLabel(a.start) }} · {{ range(a) }}</dd></div>
-        <div><dt>Profesional</dt><dd>{{ professional(a.professionalId)?.name }}</dd></div>
-        <div><dt>Servicio</dt><dd>{{ a.service }}</dd></div>
-        <div><dt>Dueño</dt><dd>{{ patient(a)?.owner }}<button type="button" class="link" (click)="call(patient(a)?.phone ?? '')">Llamar {{ patient(a)?.phone }}</button></dd></div>
-      </dl>
-      <div class="actions">
+    <vet-side-sheet label="Detalle de la cita" (closed)="close()">
+      @let p = patient(a);
+      @let pro = professional(a.professionalId);
+      @if (p) {
+        @let x = extras(p);
+        <div class="ss-hero">
+          <span class="ss-hero-av"><vet-icon name="paw" [size]="26" /></span>
+          <div>
+            <h2>{{ p.name }}</h2>
+            <p>{{ p.breed }} · {{ x.sex }} · {{ p.age }} · {{ x.weightKg }} kg</p>
+          </div>
+        </div>
+        <div class="ss-chips">
+          <span class="ss-chip" [style.color]="colors[a.status].fg" [style.background]="colors[a.status].bg">{{ statusLabel[a.status] }}</span>
+          @if (a.id === agenda.nextId()) { <span class="ss-chip" style="background: #fff4e0">Próxima · en {{ minutesUntil(a) }} min</span> }
+        </div>
+        <div class="ss-row">
+          <span class="ss-tile"><vet-icon name="cal" [size]="16" /></span>
+          <div><strong>{{ dateLabel(a.start) }}</strong><small>{{ range(a) }} {{ suffix(a) }}</small></div>
+        </div>
+        <div class="ss-row">
+          <span class="ss-tile"><vet-icon name="badge" [size]="16" /></span>
+          <div><strong>{{ pro?.name }}</strong><small>{{ pro?.role }}</small></div>
+        </div>
+        <div class="ss-row">
+          <span class="ss-tile"><vet-icon name="tag" [size]="16" /></span>
+          <div><strong>{{ a.service }}</strong><small>{{ a.minutes }} min · {{ price(a.service) }}</small></div>
+        </div>
+        <div class="ss-hr"></div>
+        <div class="ss-owner">
+          <div>
+            <small>DUEÑO</small>
+            <strong>{{ p.owner }}</strong>
+            <span class="ss-phone"><vet-icon name="phone" [size]="13" />{{ p.phone }}</span>
+          </div>
+          <a class="ss-btn" [href]="'tel:' + p.phone.replaceAll(' ', '')"><vet-icon name="phone" [size]="14" />Llamar</a>
+        </div>
+        @if (p.inApp) {
+          <p class="ss-share" style="margin: 0"><vet-icon name="shield" [size]="14" />Comparte la historia de {{ p.name }} con la clínica</p>
+        }
+        @if (a.note) {
+          <div class="ss-note">
+            <vet-icon name="note" [size]="16" />
+            <div><b>Nota del dueño al pedir la cita</b><span>{{ a.note }}</span></div>
+          </div>
+        }
+        <div class="ss-hist-h">
+          <h3>Historial reciente</h3>
+          <button type="button" class="ss-link" (click)="seeFile(p.name)">Ver ficha <vet-icon name="arrow" [size]="14" /></button>
+        </div>
+        @for (e of x.history; track e.title) {
+          <div class="ss-hist"><time>{{ e.date }}</time><div><strong>{{ e.title }}</strong><small>{{ e.by }}</small></div></div>
+        }
+      }
+      <ng-container footer>
         @switch (a.status) {
           @case ('REQUESTED') {
-            <button type="button" class="vet-btn vet-btn--primary" (click)="change(a, 'CONFIRMED', 'Cita confirmada')">Confirmar</button>
-            <button type="button" class="vet-btn vet-btn--secondary" (click)="reject(a)">Rechazar</button>
+            <button type="button" class="ss-primary" (click)="change(a, 'CONFIRMED', 'Cita confirmada')"><vet-icon name="check" [size]="16" />Confirmar cita</button>
           }
           @case ('CONFIRMED') {
-            <button type="button" class="vet-btn vet-btn--primary" (click)="change(a, 'CHECKED_IN', a.patientName + ' llegó a la clínica')">Marcar llegada</button>
-            <button type="button" class="vet-btn vet-btn--secondary" (click)="change(a, 'NO_SHOW', 'Marcada como no asistió')">No asistió</button>
+            <button type="button" class="ss-primary" (click)="change(a, 'CHECKED_IN', a.patientName + ' llegó a la clínica')"><vet-icon name="check" [size]="16" />Marcar llegada</button>
           }
           @case ('CHECKED_IN') {
-            <button type="button" class="vet-btn vet-btn--primary" (click)="change(a, 'COMPLETED', 'Cita atendida')">Atendida</button>
+            <button type="button" class="ss-primary" (click)="change(a, 'COMPLETED', 'Cita atendida')"><vet-icon name="check" [size]="16" />Marcar atendida</button>
           }
         }
-        @if (a.status !== 'CANCELLED' && a.status !== 'COMPLETED') {
-          <button type="button" class="danger" (click)="change(a, 'CANCELLED', 'Cita cancelada')">Cancelar cita</button>
+        @if (a.status === 'REQUESTED' || a.status === 'CONFIRMED') {
+          <div class="ss-two">
+            <button type="button" (click)="reschedule(a)">Reprogramar</button>
+            <button type="button" (click)="change(a, a.status === 'REQUESTED' ? 'CANCELLED' : 'NO_SHOW', a.status === 'REQUESTED' ? 'Solicitud de ' + a.patientName + ' rechazada' : 'Marcada como no asistió')">{{ a.status === 'REQUESTED' ? 'Rechazar' : 'No asistió' }}</button>
+          </div>
         }
-      </div>
-    </aside>
+        @if (a.status !== 'CANCELLED' && a.status !== 'COMPLETED' && a.status !== 'NO_SHOW') {
+          <button type="button" class="ss-danger" (click)="change(a, 'CANCELLED', 'Cita cancelada')">Cancelar cita</button>
+        }
+      </ng-container>
+    </vet-side-sheet>
   }
 </div>
