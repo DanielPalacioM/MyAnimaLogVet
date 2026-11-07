@@ -82,17 +82,24 @@ export interface Invitation {
   id: string;
   email: string;
   role: MemberRole;
+  /** Nombre de quien invitó, si se conoce. */
   invitedBy: string;
   sentAt: number;
   expiresAt: number;
+  /** El backend marca vencida una invitación que sigue `PENDING`: en ese caso se ofrece reenviar. */
+  expired: boolean;
 }
 
 export type MemberRole = 'OWNER' | 'ADMIN' | 'VET' | 'ASSISTANT' | 'RECEPTION';
-/** Tarjeta profesional: verificada, en revisión o no aplica (auxiliares y recepción). */
-export type LicenseState = 'VERIFIED' | 'IN_REVIEW' | 'NA';
+/** Tarjeta profesional: verificada, en revisión, sin enviar, rechazada o no aplica (auxiliares y recepción). */
+export type LicenseState = 'VERIFIED' | 'IN_REVIEW' | 'MISSING' | 'REJECTED' | 'NA';
 
 export interface Member {
+  /** `employeeId` del backend. */
   id: string;
+  userId: string;
+  /** Es la persona que tiene la sesión. */
+  self: boolean;
   name: string;
   email: string;
   role: MemberRole;
@@ -107,7 +114,7 @@ export interface Member {
   specialty?: string;
   university?: string;
   cardSentAt?: string;
-  /** "Lun a vie · 8:00 a. m. – 2:00 p. m." */
+  /** "Lun a vie · 8:00 a. m. – 2:00 p. m." Aún no existe en el backend: queda vacío. */
   schedule: string;
 }
 
@@ -146,7 +153,13 @@ export interface ClinicProfile {
   phone: string;
   email: string;
   city: string;
+  department: string;
   address: string;
+  legalName: string;
+  nit: string;
+  logoUrl: string | null;
+  status: string;
+  suspensionReason: string | null;
   onlineBooking: boolean;
   confirmEach: boolean;
   minCancelHours: number;

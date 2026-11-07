@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { FormBuilder, Validators } from '@angular/forms';
+import { SessionService } from '@auth/services/session.service';
 import { RegistrationStore } from '@services/register/registration.store';
 import { StepNavigator } from '@services/register/step-navigator';
 
@@ -17,6 +18,7 @@ import { StepNavigator } from '@services/register/step-navigator';
 export class IntroPage {
   private readonly store = inject(RegistrationStore);
   private readonly nav = inject(StepNavigator);
+  private readonly session = inject(SessionService);
 
   protected readonly attempted = signal(false);
   protected readonly form = inject(FormBuilder).nonNullable.group({
@@ -28,6 +30,14 @@ export class IntroPage {
     this.attempted.set(true);
     if (this.form.invalid) return;
     this.store.patch('consent', this.form.getRawValue());
+    // Quien ya tiene cuenta (registra otra clínica) no repite la cuenta ni la verificación del correo.
+    const user = this.session.user();
+    if (this.session.isAuthenticated() && user) {
+      this.store.patch('account', { fullName: user.fullName, email: user.email });
+      this.store.setFlags({ accountCreated: true, emailVerified: true });
+      this.nav.go('clinic');
+      return;
+    }
     this.nav.next('consent');
   }
 }

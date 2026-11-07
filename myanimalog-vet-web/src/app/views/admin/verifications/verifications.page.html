@@ -1,0 +1,114 @@
+<header class="head">
+  <h1>Verificaciones</h1>
+  <span class="chip mute">Solo equipo MyAnimaLog</span>
+</header>
+
+<div class="filters" role="group" aria-label="Estado de las solicitudes">
+  @for (f of filters; track f.value) {
+    <button type="button" class="chip pill" [class.on]="filter() === f.value" [attr.aria-pressed]="filter() === f.value" (click)="setFilter(f.value)">
+      {{ f.label }}@if (f.counted) { {{ count(f.value) }} }
+    </button>
+  }
+</div>
+
+<div class="cols">
+  <section class="list" aria-label="Solicitudes">
+    @if (loading() && !queue()) {
+      <p class="empty" role="status">Cargando solicitudes…</p>
+    } @else if (error()) {
+      <div class="empty">
+        <p role="alert">{{ error() }}</p>
+        <button type="button" class="btn btn--ghost" (click)="loadQueue()">Reintentar</button>
+      </div>
+    } @else {
+      @for (item of items(); track item.requestId) {
+        <button type="button" class="row" [class.on]="item.requestId === selectedId()" [attr.aria-current]="item.requestId === selectedId() ? 'true' : null" (click)="select(item.requestId)">
+          <span class="line">
+            <strong>{{ item.subjectName }}</strong>
+            <span class="chip" [ngClass]="chip(item).tone">{{ chip(item).label }}</span>
+          </span>
+          <small>{{ kind(item) }}</small>
+        </button>
+      } @empty {
+        <p class="empty">No hay solicitudes en esta pestaña.</p>
+      }
+    }
+  </section>
+
+  <section class="detail" aria-label="Detalle de la solicitud">
+    @if (detailLoading() && !detail()) {
+      <p class="empty" role="status">Abriendo la solicitud…</p>
+    } @else if (detailError()) {
+      <p class="empty" role="alert">{{ detailError() }}</p>
+    } @else if (view(); as v) {
+      <div class="title">
+        <h2>{{ v.title }}</h2>
+        <span class="chip" [ngClass]="v.status.tone">{{ v.status.label }}</span>
+      </div>
+
+      <div class="facts">
+        <dl>
+          @for (f of v.left; track f.label) {
+            <div><dt>{{ f.label }}</dt><dd>{{ f.value }}</dd></div>
+          }
+        </dl>
+        <dl>
+          @for (f of v.right; track f.label) {
+            <div><dt>{{ f.label }}</dt><dd>{{ f.value }}</dd></div>
+          }
+        </dl>
+      </div>
+
+      <h3>Documentos</h3>
+      @for (doc of v.docs; track doc.id; let i = $index) {
+        <div class="doc">
+          <div class="doc-txt">
+            <strong>{{ doc.title }}</strong>
+            <small>{{ doc.sub }}</small>
+          </div>
+          <button type="button" class="btn btn--small" (click)="openDocument(i)">Ver (enlace de 10 min)</button>
+        </div>
+      } @empty {
+        <p class="soft">Esta solicitud no tiene documentos.</p>
+      }
+
+      @if (v.duplicates.length) {
+        <p class="alert" role="alert">Atención: {{ v.duplicates.length === 1 ? 'un archivo de esta solicitud ya aparece' : v.duplicates.length + ' archivos de esta solicitud ya aparecen' }} en otro registro. Revísalo antes de decidir.</p>
+      }
+
+      <section class="ai" aria-label="Reporte de la IA">
+        <div class="ai-head">
+          <strong>Reporte de la IA · solo apoyo</strong>
+          <span class="chip" [ngClass]="v.ai.chip.tone">{{ v.ai.chip.label }}</span>
+          <button type="button" class="link" [disabled]="rerunning()" (click)="rerunAi()">{{ rerunning() ? 'Analizando…' : 'Volver a analizar' }}</button>
+        </div>
+        @for (c of v.ai.checks; track c.text) {
+          <p class="check">{{ c.ok ? '✓' : '⚠' }} {{ c.text }}</p>
+        } @empty {
+          <p class="check">La IA no generó un reporte para esta solicitud: la revisión es manual.</p>
+        }
+        <p class="fine">{{ v.who }} nunca ve este reporte ni el nivel de riesgo.</p>
+      </section>
+
+      @if (canDecide()) {
+        <label class="confirm">
+          <input type="checkbox" [checked]="checked()" (change)="checked.set($any($event.target).checked)" />
+          <span class="box" aria-hidden="true"></span>
+          <span class="txt">{{ v.checkText }}@if (detail()?.registryLookupUrl; as url) { <a [href]="url" target="_blank" rel="noopener noreferrer" (click)="$event.stopPropagation()">Abrir el registro oficial ↗</a> }</span>
+        </label>
+
+        <div class="decide">
+          <button type="button" class="btn btn--bad" (click)="reject()">Rechazar</button>
+          <button type="button" class="btn btn--ghost" (click)="requestCorrection()">Pedir corrección</button>
+          <span class="spacer"></span>
+          <button type="button" class="btn btn--primary" [disabled]="!checked() || deciding()" (click)="approve()">{{ deciding() ? 'Aprobando…' : v.approveLabel }}</button>
+        </div>
+        <p class="fine">{{ v.footNote }}</p>
+      } @else {
+        <p class="soft">Esta solicitud ya tiene una decisión ({{ v.status.label.toLowerCase() }}).</p>
+      }
+    } @else {
+      <p class="empty">Elige una solicitud de la lista para revisarla.</p>
+    }
+  </section>
+</div>

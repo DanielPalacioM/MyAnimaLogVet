@@ -1,0 +1,14 @@
+{
+  "/user-api": {
+    "target": "https://pets-api-gateway-20369076707.us-central1.run.app",
+    "secure": true,
+    "changeOrigin": true,
+    "pathRewrite": { "^/user-api": "/api" }
+  },
+  "/vet-api": {
+    "target": "https://pets-api-gateway-20369076707.us-central1.run.app",
+    "secure": true,
+    "changeOrigin": true,
+    "pathRewrite": { "^/vet-api": "" }
+  }
+}

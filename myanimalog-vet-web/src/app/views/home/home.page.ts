@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
+import { errorMessage } from '@services/api-error';
 import { Appointment } from '@services/clinic/clinic.models';
 import { ClinicStore } from '@services/clinic/clinic.store';
 import { hourParts } from '@services/clinic/date.utils';
@@ -86,8 +87,10 @@ export class HomePage {
   }
 
   protected resend(id: string, name: string): void {
-    this.home.resend(id);
-    this.actions.toast(`Invitación reenviada a ${name}`);
+    this.home.resend(id).subscribe({
+      next: () => this.actions.toast(`Invitación reenviada a ${name}`),
+      error: (e: unknown) => this.actions.toast(errorMessage(e)),
+    });
   }
 
   protected seePlan(): void {

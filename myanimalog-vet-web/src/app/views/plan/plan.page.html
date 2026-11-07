@@ -1,0 +1,46 @@
+<header class="head">
+  <h1>Plan</h1>
+</header>
+
+@if (loading()) {
+  <p class="state" role="status">Cargando el plan…</p>
+} @else if (error(); as message) {
+  <div class="state">
+    <p role="alert">{{ message }}</p>
+    <button type="button" class="vet-btn vet-btn--secondary" (click)="load()">Reintentar</button>
+  </div>
+} @else if (subscription(); as s) {
+  <section class="card" aria-labelledby="plan-title">
+    <div class="top">
+      <div>
+        <p class="label">Tu plan</p>
+        <h2 id="plan-title">{{ name() }}</h2>
+      </div>
+      <span class="chip" [ngClass]="expired() ? 'bad' : 'ok'">{{ expired() ? 'Vencido' : 'Vigente' }}</span>
+    </div>
+
+    <dl>
+      <dt>Empezó</dt><dd>{{ start() }}</dd>
+      <dt>Termina</dt><dd>{{ end() }}</dd>
+      @if (!expired()) {
+        <dt>Te quedan</dt><dd>{{ daysLeft() }} {{ daysLeft() === 1 ? 'día' : 'días' }}</dd>
+      }
+    </dl>
+
+    @if (trial() && !expired()) {
+      <p class="box">Estás en la prueba PRO de 30 días: agenda en línea, equipo ilimitado, reportes y resumen con IA. Al terminar puedes elegir tu plan o seguir gratis.</p>
+    }
+    @if (expired()) {
+      <p class="box box--bad">Tu plan venció el {{ end() }}. Escríbenos a <a href="mailto:MyAnimaLog@gmail.com">MyAnimaLog&#64;gmail.com</a> para renovarlo.</p>
+    }
+  </section>
+} @else {
+  <section class="card">
+    <h2>Todavía no tienes un plan</h2>
+    <p class="box">El plan de prueba se crea cuando el equipo de MyAnimaLog aprueba tu clínica. Si ya está aprobada y no ves tu plan, escríbenos a <a href="mailto:MyAnimaLog@gmail.com">MyAnimaLog&#64;gmail.com</a>.</p>
+  </section>
+}
+
+@if (!loading() && !error()) {
+  <p class="note">El uso frente a los límites de cada plan (pacientes, almacenamiento) y el cambio de plan estarán disponibles pronto.</p>
+}

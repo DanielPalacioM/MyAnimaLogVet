@@ -2,7 +2,9 @@
   <header class="head">
     <h1>Equipo</h1>
     <small class="total">{{ summary() }}</small>
-    <button type="button" class="vet-btn vet-btn--primary" (click)="invite()"><vet-icon name="plus" [size]="16" />Invitar</button>
+    @if (svc.iCanManage()) {
+      <button type="button" class="vet-btn vet-btn--primary" (click)="invite()"><vet-icon name="plus" [size]="16" />Invitar</button>
+    }
   </header>
 
   <div class="filters">
@@ -39,6 +41,12 @@
     </section>
   }
 
+  @if (svc.state() === 'loading' && !svc.members().length) {
+    <p class="state" role="status">Cargando el equipo…</p>
+  } @else if (svc.state() === 'error' && !svc.members().length) {
+    <p class="state state--error" role="alert">No pudimos cargar el equipo. <button type="button" class="link" (click)="reload()">Reintentar</button></p>
+  }
+
   <section class="table" aria-label="Miembros del equipo">
     <div class="row hdr" role="row">
       <span>MIEMBRO</span><span>ROL</span><span>TARJETA PROFESIONAL</span><span>HISTORIA CLÍNICA</span><span>ESTADO</span><span>SE UNIÓ</span><span></span>
@@ -60,6 +68,8 @@
           @switch (m.license) {
             @case ('VERIFIED') { <em class="chip chip--ok"><i></i>Verificada</em> }
             @case ('IN_REVIEW') { <em class="chip chip--warn"><i></i>En revisión</em> }
+            @case ('MISSING') { <em class="chip chip--gray"><i></i>Sin enviar</em> }
+            @case ('REJECTED') { <em class="chip chip--bad"><i></i>Rechazada</em> }
             @default { <span class="muted">No aplica</span> }
           }
         </span>
@@ -82,7 +92,7 @@
       <button mat-menu-item (click)="svc.selectedId.set(m.id)">Ver ficha</button>
       @if (canManage(m)) {
         <button mat-menu-item (click)="changeRole(m)">Cambiar rol</button>
-        @if (m.active) { <button mat-menu-item (click)="deactivate(m)">Desactivar</button> } @else { <button mat-menu-item (click)="activate(m)">Activar</button> }
+        @if (m.active) { <button mat-menu-item (click)="deactivate(m)">Retirar</button> }
       }
     </ng-template>
   </mat-menu>
@@ -101,6 +111,15 @@
         @if (m.active) { <span class="ss-tag" style="background: #e8f5e9; color: #2e7d32"><i></i>Activo</span> } @else { <span class="ss-tag" style="background: #f0f0f3; color: #6b6b80"><i></i>Inactivo</span> }
       </div>
 
+      @if (m.license === 'MISSING' || m.license === 'REJECTED') {
+        <div class="ss-alert">
+          <vet-icon name="note" [size]="16" />
+          <div>
+            <b>Aún no puede escribir historia clínica</b>
+            <span>{{ m.license === 'REJECTED' ? 'Su tarjeta profesional no fue aprobada. Debe enviarla de nuevo desde Mi perfil profesional.' : 'Todavía no envía su tarjeta profesional. Mientras tanto puede atender la agenda y leer la historia.' }}</span>
+          </div>
+        </div>
+      }
       @if (m.license === 'IN_REVIEW') {
         <div class="ss-alert">
           <vet-icon name="note" [size]="16" />
@@ -111,7 +130,7 @@
         </div>
       }
 
-      @if (m.profession) {
+      @if (m.card) {
         <h3 class="ss-title">Perfil profesional</h3>
         <div class="ss-card">
           <div class="ss-kv"><span>Profesión</span><b>{{ m.profession }}</b></div>
@@ -121,7 +140,9 @@
           <div class="ss-kv">
             <span>Verificación</span>
             @if (m.license === 'VERIFIED') { <em class="ss-tag" style="background: #e0fffa; color: #00796b"><i></i>Verificada</em> }
-            @else { <em class="ss-tag" style="background: #fff4e0; color: #b26a00"><i></i>En revisión</em><small style="color: #8a8a9a">enviada el {{ m.cardSentAt }}</small> }
+            @else if (m.license === 'IN_REVIEW') { <em class="ss-tag" style="background: #fff4e0; color: #b26a00"><i></i>En revisión</em> }
+            @else if (m.license === 'REJECTED') { <em class="ss-tag" style="background: #fef3f2; color: #b42318"><i></i>Rechazada</em> }
+            @else { <em class="ss-tag" style="background: #f0f0f3; color: #6b6b80"><i></i>Sin enviar</em> }
           </div>
         </div>
       }
@@ -137,7 +158,7 @@
         }
       </div>
 
-      @if (m.schedule !== '—') {
+      @if (m.schedule) {
         <div class="ss-schedule">
           <vet-icon name="clock" [size]="16" />
           <div><strong>{{ m.schedule }}</strong><small>Se edita en Servicios y horarios</small></div>
@@ -149,15 +170,15 @@
         @if (canManage(m)) {
           <div class="ss-two">
             <button type="button" (click)="changeRole(m)">Cambiar rol</button>
-            <button type="button" (click)="transfer(m)">Transferir propiedad</button>
+            @if (svc.iAmOwner()) { <button type="button" (click)="transfer(m)">Transferir propiedad</button> }
           </div>
           @if (m.active) {
-            <button type="button" class="ss-quit" (click)="deactivate(m)"><strong>Desactivar</strong><small>Pierde el acceso a la clínica en máximo 15 minutos.</small></button>
-          } @else {
-            <button type="button" class="ss-primary" (click)="activate(m)">Activar de nuevo</button>
+            <button type="button" class="ss-quit" (click)="deactivate(m)"><strong>Retirar del equipo</strong><small>Pierde el acceso a la clínica en su siguiente petición.</small></button>
           }
         } @else if (m.role === 'OWNER') {
           <p class="ss-hint">La propiedad se transfiere desde la ficha de otra persona del equipo.</p>
+        } @else if (!m.active) {
+          <p class="ss-hint">Para que vuelva al equipo, invítalo de nuevo.</p>
         }
       </ng-container>
     </vet-side-sheet>

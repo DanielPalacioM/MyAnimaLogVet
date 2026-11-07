@@ -8,6 +8,8 @@
     <button type="button" class="vet-btn vet-btn--primary" (click)="add()"><vet-icon name="plus" [size]="16" />Agregar paciente</button>
   </header>
 
+  <vet-soon-note feature="patients" />
+
   <div class="filters">
     <div class="tabs" role="group" aria-label="Especie">
       @for (t of tabs; track t.value) {
@@ -69,14 +71,13 @@
   </section>
 
   @if (svc.selected(); as p) {
-    @let x = extras(p);
     @let next = svc.nextAppointmentsOf(p.id)[0];
     <vet-side-sheet label="Ficha del paciente" (closed)="svc.selectedId.set(null)">
       <div class="ss-hero">
         <span class="ss-hero-av"><vet-icon name="paw" [size]="26" /></span>
         <div>
           <h2>{{ p.name }}</h2>
-          <p>{{ p.breed }} · {{ x.sex }} · {{ p.age }} · {{ x.weightKg }} kg</p>
+          <p>{{ p.species }} · {{ p.breed }} · {{ p.age }}</p>
         </div>
       </div>
       <div class="ss-chips">
@@ -94,13 +95,9 @@
       <div class="ss-row">
         <span class="ss-tile"><vet-icon name="badge" [size]="16" /></span>
         <div>
-          <strong>Paciente desde el {{ x.since }}</strong>
-          <small>{{ p.inApp ? x.sharedBy + ' lo compartió desde la app' : 'Registrado por la clínica' }}</small>
+          <strong>{{ p.inApp ? 'Compartido por el dueño desde la app' : 'Registrado por la clínica' }}</strong>
+          <small>Última visita: {{ p.lastVisit }}</small>
         </div>
-      </div>
-      <div class="ss-row">
-        <span class="ss-tile"><vet-icon name="tag" [size]="16" /></span>
-        <div><strong>Microchip {{ x.microchip }}</strong><small>{{ x.weightKg }} kg · última visita {{ p.lastVisit }}</small></div>
       </div>
       <div class="ss-hr"></div>
       <div class="ss-owner">
@@ -115,19 +112,6 @@
         <p class="ss-share" style="margin: 0"><vet-icon name="shield" [size]="14" />Comparte la historia de {{ p.name }} con la clínica</p>
       } @else {
         <button type="button" class="ss-link" (click)="claimLink(p.owner)">Enviar enlace para reclamar</button>
-      }
-      @if (x.alert) {
-        <div class="ss-note ss-note--alert">
-          <vet-icon name="note" [size]="16" />
-          <div><b>ALERTA CLÍNICA</b><span>{{ x.alert }}</span></div>
-        </div>
-      }
-      <div class="ss-hist-h">
-        <h3>Historial reciente</h3>
-        <button type="button" class="ss-link" (click)="soon()">Ver historia completa <vet-icon name="arrow" [size]="14" /></button>
-      </div>
-      @for (e of x.history; track e.title) {
-        <div class="ss-hist"><time>{{ e.date }}</time><div><strong>{{ e.title }}</strong><small>{{ e.by }}</small></div></div>
       }
       <ng-container footer>
         <button type="button" class="ss-primary" (click)="registerVisit(p.name)"><vet-icon name="plus" [size]="16" />Registrar visita</button>

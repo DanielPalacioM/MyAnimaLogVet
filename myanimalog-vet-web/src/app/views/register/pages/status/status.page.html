@@ -1,54 +1,151 @@
-<vet-step-frame
-  title="En revisión"
-  subtitle="Recibimos tu solicitud. Te avisaremos por correo cuando tengamos una respuesta"
->
-  <ol class="timeline" aria-label="Avance de tu solicitud">
-    @for (m of milestones(); track m.label) {
-      <li [class]="'milestone milestone--' + m.state" [attr.aria-current]="m.state === 'current' ? 'step' : null">
-        <span class="dot" aria-hidden="true">
-          @if (m.state === 'done') {
-            <mat-icon fontSet="material-icons-outlined">check</mat-icon>
-          } @else if (m.state === 'current') {
-            <span class="dot-core"></span>
-          }
-        </span>
-        <span class="milestone-label">{{ m.label }}</span>
-        <span class="milestone-detail">{{ m.detail }}</span>
-      </li>
-    }
-  </ol>
-
+<vet-step-frame [title]="title()" [subtitle]="subtitle()">
   @if (error(); as message) {
     <p class="reg-alert reg-alert--error" role="alert">{{ message }}</p>
   }
 
-  <section class="meanwhile" aria-labelledby="meanwhile-title">
-    <h2 id="meanwhile-title">Mientras esperas puedes…</h2>
-    <ul>
-      @for (task of tasks; track task.label) {
-        <li>
-          @if (panelReady) {
-            <a [routerLink]="task.link">
-              <mat-icon fontSet="material-icons-outlined" aria-hidden="true">{{ task.icon }}</mat-icon>
-              <span>{{ task.label }}</span>
-              <mat-icon class="chevron" fontSet="material-icons-outlined" aria-hidden="true">chevron_right</mat-icon>
-            </a>
-          } @else {
-            <div class="task-off" aria-disabled="true">
-              <mat-icon fontSet="material-icons-outlined" aria-hidden="true">{{ task.icon }}</mat-icon>
-              <span>{{ task.label }}</span>
-              <small>Pronto</small>
-            </div>
+  @switch (status()) {
+    @case ('NEEDS_CORRECTION') {
+      <ng-container *ngTemplateOutlet="documentsTpl" />
+    }
+    @case ('DRAFT') {
+      <ng-container *ngTemplateOutlet="documentsTpl" />
+    }
+
+    @case ('REJECTED') {
+      <section class="note" aria-labelledby="reason-title">
+        <h2 id="reason-title">Motivo</h2>
+        <p>{{ note() || 'El equipo de MyAnimaLog no pudo verificar los datos de tu solicitud.' }}</p>
+      </section>
+
+      <section class="next" aria-labelledby="next-title">
+        <h2 id="next-title">¿Qué puedes hacer?</h2>
+        <ul>
+          <li>Revisa el motivo y prepara los documentos correctos.</li>
+          <li>
+            @if (attemptsRemaining() !== null) {
+              Envía una nueva solicitud. Te {{ attemptsRemaining() === 1 ? 'queda' : 'quedan' }} {{ attemptsRemaining() }} de {{ maxAttempts() }} {{ attemptsRemaining() === 1 ? 'intento' : 'intentos' }}.
+            } @else {
+              Envía una nueva solicitud con los documentos correctos.
+            }
+          </li>
+          <li>Si crees que es un error, escríbenos a {{ supportEmail }}.</li>
+        </ul>
+      </section>
+      <p class="limits">Por seguridad, borraremos los documentos de esta solicitud en 90 días.</p>
+    }
+
+    @case ('ACTIVE') {
+      <div class="approved">
+        <span class="seal" aria-hidden="true"><mat-icon fontSet="material-icons-outlined">check</mat-icon></span>
+        <span class="badge"><mat-icon fontSet="material-icons-outlined" aria-hidden="true">verified_user</mat-icon>Clínica verificada</span>
+      </div>
+      <section class="trial" aria-labelledby="trial-title">
+        <h2 id="trial-title">Tu prueba PRO de 30 días empieza hoy</h2>
+        <p>Agenda en línea, equipo ilimitado, reportes y resumen con IA. Al terminar puedes elegir tu plan o seguir gratis.</p>
+      </section>
+      <p class="limits">Ya puedes recibir pacientes, citas y aparecer en el directorio de MyAnimaLog.</p>
+    }
+
+    @default {
+      <ol class="timeline" aria-label="Avance de tu solicitud">
+        @for (m of milestones(); track m.label) {
+          <li [class]="'milestone milestone--' + m.state" [attr.aria-current]="m.state === 'current' ? 'step' : null">
+            <span class="dot" aria-hidden="true">
+              @if (m.state === 'done') {
+                <mat-icon fontSet="material-icons-outlined">check</mat-icon>
+              } @else if (m.state === 'current') {
+                <span class="dot-core"></span>
+              }
+            </span>
+            <span class="milestone-label">{{ m.label }}</span>
+            <span class="milestone-detail">{{ m.detail }}</span>
+          </li>
+        }
+      </ol>
+
+      <section class="meanwhile" aria-labelledby="meanwhile-title">
+        <h2 id="meanwhile-title">Mientras esperas puedes…</h2>
+        <ul>
+          @for (task of tasks; track task.label) {
+            <li>
+              @if (panelReady) {
+                <a [routerLink]="task.link">
+                  <mat-icon fontSet="material-icons-outlined" aria-hidden="true">{{ task.icon }}</mat-icon>
+                  <span>{{ task.label }}</span>
+                  <mat-icon class="chevron" fontSet="material-icons-outlined" aria-hidden="true">chevron_right</mat-icon>
+                </a>
+              } @else {
+                <div class="task-off" aria-disabled="true">
+                  <mat-icon fontSet="material-icons-outlined" aria-hidden="true">{{ task.icon }}</mat-icon>
+                  <span>{{ task.label }}</span>
+                  <small>Pronto</small>
+                </div>
+              }
+            </li>
           }
-        </li>
-      }
-    </ul>
-  </section>
+        </ul>
+      </section>
 
-  <p class="limits">Aún no puedes recibir pacientes ni aparecer en el directorio. Se activa al aprobarte.</p>
+      <p class="limits">Aún no puedes recibir pacientes ni aparecer en el directorio. Se activa al aprobarte.</p>
+    }
+  }
 
+  <!-- Un solo pie: dentro de un @case no se proyectaría en su lugar. -->
   <div class="reg-footer" footer>
-    <button type="button" class="vet-btn vet-btn--secondary" (click)="registerAnother()">Registrar otra clínica</button>
-    <a routerLink="/inicio" class="vet-btn vet-btn--primary">Ir al panel</a>
+    @switch (status()) {
+      @case ('NEEDS_CORRECTION') {
+        <button type="button" class="vet-btn vet-btn--primary" [disabled]="busy() || !canResubmit()" (click)="resubmit()">
+          {{ busy() ? 'Enviando…' : 'Reenviar a verificación' }}
+        </button>
+      }
+      @case ('DRAFT') {
+        <button type="button" class="vet-btn vet-btn--primary" [disabled]="busy() || !canResubmit()" (click)="resubmit()">
+          {{ busy() ? 'Enviando…' : 'Enviar a verificación' }}
+        </button>
+      }
+      @case ('REJECTED') {
+        <a class="vet-btn vet-btn--secondary" [href]="supportLink">Contactar soporte</a>
+        <button type="button" class="vet-btn vet-btn--primary" [disabled]="busy() || !canRetry()" (click)="retry()">
+          {{ busy() ? 'Abriendo…' : 'Nueva solicitud' }}
+        </button>
+      }
+      @case ('ACTIVE') {
+        <a [routerLink]="panelLink()" class="vet-btn vet-btn--primary">Entrar al panel</a>
+      }
+      @default {
+        <button type="button" class="vet-btn vet-btn--secondary" (click)="registerAnother()">Registrar otra clínica</button>
+        <a routerLink="/inicio" class="vet-btn vet-btn--primary">Ir al panel</a>
+      }
+    }
   </div>
 </vet-step-frame>
+
+<!-- Corrección (Figma 1911:198) y documentos de un intento nuevo: nota del revisor y tarjetas de documento. -->
+<ng-template #documentsTpl>
+  @if (note(); as text) {
+    <section class="reviewer" aria-labelledby="reviewer-title">
+      <h2 id="reviewer-title"><mat-icon fontSet="material-icons-outlined" aria-hidden="true">warning_amber</mat-icon>Nota del revisor</h2>
+      <p>{{ text }}</p>
+    </section>
+  }
+
+  <ul class="docs">
+    @for (row of rows(); track row.type) {
+      <li>
+        <vet-document-card
+          [title]="row.title"
+          [hint]="row.hint"
+          [state]="row.state"
+          [fileName]="row.fileName"
+          [fileSize]="row.fileSize"
+          [locked]="!row.editable"
+          (picked)="pick(row.type, $event)"
+        />
+      </li>
+    } @empty {
+      @if (!loading()) {
+        <li class="empty">No hay documentos por mostrar.</li>
+      }
+    }
+  </ul>
+</ng-template>

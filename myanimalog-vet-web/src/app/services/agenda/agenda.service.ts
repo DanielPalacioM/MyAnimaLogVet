@@ -23,7 +23,10 @@ export class AgendaService {
   readonly month = signal(startOfDay(Date.now()));
   readonly selectedId = signal<string | null>(null);
 
-  readonly professionals = this.store.professionals;
+  /** Las columnas de la agenda son las personas del equipo que atienden. */
+  get professionals() {
+    return this.store.professionals;
+  }
   readonly requests = this.store.pendingRequests;
 
   readonly isToday = computed(() => sameDay(this.day(), this.store.now()));

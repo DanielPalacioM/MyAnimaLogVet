@@ -1,0 +1,68 @@
+<vet-auth-shell side="left">
+  <section class="select">
+    @if (loading()) {
+      <p class="lead" role="status">Buscando tus clínicas…</p>
+    } @else if (!clinics().length) {
+      <h1>Te damos la bienvenida a MyAnimaLogVet</h1>
+      <p class="lead">Todavía no trabajas en ninguna clínica.</p>
+
+      <div class="card">
+        <h2>¿Tienes una clínica?</h2>
+        <p>Regístrala y verifícala. Mientras la revisamos puedes configurarla y armar tu equipo.</p>
+        <a class="vet-btn vet-btn--primary" routerLink="/registro" (click)="newRegistration()">Registrar mi clínica</a>
+      </div>
+
+      <div class="card">
+        <h2>¿Trabajas en una clínica?</h2>
+        <p>Pídele al administrador que te invite con tu correo (<strong>{{ email() }}</strong>). La invitación aparecerá aquí y en tu correo.</p>
+      </div>
+
+      @if (invitations().length) { <ng-container *ngTemplateOutlet="invites" /> }
+    } @else {
+      <h1>Elige tu clínica</h1>
+      <p class="lead">Hola, {{ session.firstName() }}. Trabajas en {{ clinics().length }} {{ clinics().length === 1 ? 'clínica' : 'clínicas' }}. Elige con cuál vas a trabajar ahora.</p>
+
+      <ul class="clinics">
+        @for (c of clinics(); track c.veterinaryId) {
+          <li>
+            <button type="button" class="clinic" (click)="choose(c)" [disabled]="!!entering()" [attr.aria-label]="'Entrar a ' + c.veterinaryName">
+              <span class="av">{{ initials(c.veterinaryName) }}</span>
+              <span class="txt">
+                <strong>{{ c.veterinaryName }}</strong>
+                <small>{{ roleText(c.role) }} · <span [class.ok]="c.status === 'ACTIVE'" [class.warn]="c.status !== 'ACTIVE'">{{ statusText(c.status) }}</span></small>
+              </span>
+              <span class="go" aria-hidden="true">{{ entering() === c.veterinaryId ? '…' : '›' }}</span>
+            </button>
+          </li>
+        }
+      </ul>
+
+      @if (invitations().length) { <ng-container *ngTemplateOutlet="invites" /> }
+
+      <a class="more" routerLink="/registro" (click)="newRegistration()">+ Registrar otra clínica</a>
+      <p class="foot">Puedes ser dueño de hasta 3 clínicas.</p>
+    }
+
+    @if (error()) {
+      <p class="error" role="alert">{{ error() }}</p>
+    }
+
+    <button type="button" class="signout" (click)="signOut()">Cerrar sesión</button>
+  </section>
+
+  <ng-template #invites>
+    <h3 class="label">INVITACIONES</h3>
+    <ul class="clinics">
+      @for (i of invitations(); track i.invitationId) {
+        <li class="invite">
+          <span class="av av--soft">{{ initials(i.veterinaryName ?? '?') }}</span>
+          <span class="txt">
+            <strong>{{ i.veterinaryName ?? 'Una clínica' }}</strong>
+            <small>Te invitó como {{ roleText(i.role).toLowerCase() }} · {{ expires(i.expiresAt) }}</small>
+            <small class="hint">Abre el enlace del correo de la invitación para aceptarla.</small>
+          </span>
+        </li>
+      }
+    </ul>
+  </ng-template>
+</vet-auth-shell>

@@ -1,6 +1,12 @@
-import { computed, Injectable, signal } from '@angular/core';
-import { buildAppointments, buildPatients, PROFESSIONALS, TODAY } from './clinic.seed';
-import { buildBlocks, buildInvitations, CATALOG, CLIENT_OVERRIDES, MEMBERS, PROFILE, SCHEDULE } from './clinic-settings.seed';
+import { computed, inject, Injectable, signal } from '@angular/core';
+import { SessionService } from '@auth/services/session.service';
+import { ClinicContextService } from '@auth/services/clinic-context.service';
+import { catchError, EMPTY, forkJoin, map, Observable, of, switchMap, tap } from 'rxjs';
+import { ApiError } from '../api-error';
+import { ClinicProfileDto, SubscriptionDto } from '../api/api.models';
+import { ClinicApi } from '../api/clinic.api';
+import { hasProfessionalProfile, invitationFrom, memberFrom, profileFrom, roleFromApi, roleToApi } from '../api/mappers';
+import { TeamApi } from '../api/team.api';
 import {
   Appointment,
   AppointmentStatus,
@@ -15,48 +21,81 @@ import {
   NewAppointment,
   NewPatient,
   Patient,
-  ROLE_LABEL,
+  Professional,
   ScheduleDay,
 } from './clinic.models';
-import { at, sameDay, startOfDay } from './date.utils';
+import { at, sameDay } from './date.utils';
 
 const DAY = 86_400_000;
-const hash = (s: string): number => [...s].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7);
+const COLORS = ['#F5A623', '#BDB8EE', '#9FE3D6', '#FFE2B8', '#FCE3E3', '#D9F5EF'];
 const slug = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '.').replace(/^\.|\.$/g, '');
-const initialsOf = (name: string) => name.split(' ').map((p) => p[0]).slice(0, 2).join('').toUpperCase();
+const initialsOf = (name: string) => name.split(' ').filter(Boolean).map((p) => p[0]).slice(0, 2).join('').toUpperCase();
 const toMin = (hhmm: string) => {
   const [h, m] = hhmm.split(':').map(Number);
   return h * 60 + m;
 };
 
+export type LoadState = 'idle' | 'loading' | 'ready' | 'error';
+
 /**
- * Datos de prueba de la clínica (pacientes, citas, equipo, servicios, horario, perfil). Hoy viven en memoria y se
- * reinician al recargar; al conectar el backend, esta clase se reemplaza por llamadas HTTP y las vistas no cambian.
+ * Datos de la clínica con la que se trabaja.
+ *
+ * **Conectado al backend:** perfil y configuración, logo, código de vinculación, plan, equipo e invitaciones.
+ * **Sin backend todavía** (pacientes, citas, servicios, horario, bloqueos): quedan vacíos; no se inventan datos.
+ * Cuando esos servicios existan, se cargan aquí mismo y las vistas no cambian.
  */
 @Injectable({ providedIn: 'root' })
 export class ClinicStore {
-  readonly professionals = PROFESSIONALS;
+  private readonly clinicApi = inject(ClinicApi);
+  private readonly teamApi = inject(TeamApi);
+  private readonly session = inject(SessionService);
+  private readonly context = inject(ClinicContextService);
 
-  readonly patients = signal<Patient[]>(buildPatients(TODAY()));
-  readonly appointments = signal<Appointment[]>(buildAppointments(TODAY(), this.patients()));
-  /** Pacientes a los que ya se les avisó por la vacuna vencida (se quitan de "Por resolver"). */
+  // ---- Del backend ----
+  readonly profileDto = signal<ClinicProfileDto | null>(null);
+  readonly profileState = signal<LoadState>('idle');
+  readonly subscription = signal<SubscriptionDto | null>(null);
+  readonly subscriptionState = signal<LoadState>('idle');
+  readonly members = signal<Member[]>([]);
+  readonly invitations = signal<Invitation[]>([]);
+  readonly teamState = signal<LoadState>('idle');
+  /** Código `VET-XXXXXXXX` para vincular dueños. Solo se conoce si el perfil lo trae o al generarlo. */
+  readonly linkCode = signal<string | null>(null);
+
+  // ---- Sin backend todavía ----
+  readonly patients = signal<Patient[]>([]);
+  readonly appointments = signal<Appointment[]>([]);
+  /** Pacientes a los que ya se les avisó por la vacuna vencida. */
   readonly notifiedVaccines = signal<ReadonlySet<string>>(new Set());
+  readonly catalog = signal<ClinicService[]>([]);
+  readonly schedule = signal<ScheduleDay[]>([]);
+  readonly blocks = signal<ClinicBlock[]>([]);
+
   /** Reloj en ms (se actualiza cada minuto) para "próxima cita" y la línea de "ahora". */
   readonly now = signal(Date.now());
 
-  // ---- Equipo ----
-  readonly members = signal<Member[]>(MEMBERS);
-  readonly invitations = signal<Invitation[]>(buildInvitations(Date.now()));
+  readonly profile = computed<ClinicProfile | null>(() => {
+    const dto = this.profileDto();
+    return dto ? profileFrom(dto) : null;
+  });
 
-  // ---- Servicios y horarios ----
-  readonly catalog = signal<ClinicService[]>(CATALOG);
-  readonly schedule = signal<ScheduleDay[]>(SCHEDULE);
-  readonly blocks = signal<ClinicBlock[]>(buildBlocks(TODAY()));
+  /** Personas que atienden (no cuenta recepción ni inactivos): son las columnas de la agenda. */
+  readonly professionalList = computed<Professional[]>(() =>
+    this.members()
+      .filter((m) => m.active && m.role !== 'RECEPTION')
+      .map((m, i) => ({
+        id: m.id,
+        name: m.name,
+        initials: initialsOf(m.name),
+        role: m.roleLabel,
+        color: COLORS[i % COLORS.length],
+        verified: m.license === 'VERIFIED',
+      })),
+  );
 
-  // ---- Mi clínica ----
-  readonly profile = signal<ClinicProfile>(PROFILE);
-  /** Código para vincular dueños en recepción (QR). */
-  readonly linkCode = signal<string | null>('PATI-7K2Q');
+  get professionals(): Professional[] {
+    return this.professionalList();
+  }
 
   /** Servicios que se pueden agendar (los activos). */
   get services(): ClinicService[] {
@@ -73,8 +112,8 @@ export class ClinicStore {
   readonly overdueVaccines = computed(() => this.patients().filter((p) => p.vaccines === 'OVERDUE'));
   readonly vaccinesToNotify = computed(() => this.overdueVaccines().filter((p) => !this.notifiedVaccines().has(p.id)));
 
-  /** Invitaciones que aún se pueden aceptar. */
-  readonly pendingInvitations = computed(() => this.invitations().filter((i) => i.expiresAt > this.now()));
+  /** Invitaciones que aún se pueden aceptar (vigentes). */
+  readonly pendingInvitations = computed(() => this.invitations().filter((i) => !i.expired));
 
   /** Dueños con al menos una mascota compartida con la clínica. */
   readonly clients = computed<Client[]>(() => {
@@ -86,28 +125,23 @@ export class ClinicStore {
       else byOwner.set(p.owner, [p]);
     }
     const now = this.now();
-    const today = startOfDay(now);
     const appointments = this.appointments();
     return [...byOwner.entries()].map(([owner, pets]): Client => {
-      const h = hash(owner);
-      const over = CLIENT_OVERRIDES[owner];
       const last = pets.reduce((a, b) => (b.lastVisitAt > a.lastVisitAt ? b : a));
       const ids = new Set(pets.map((p) => p.id));
       const next =
         appointments
           .filter((a) => ids.has(a.patientId) && a.status !== 'CANCELLED' && a.status !== 'NO_SHOW' && a.start + a.minutes * 60_000 >= now)
           .sort((a, b) => a.start - b.start)[0] ?? null;
-      const claimed = h % 5 === 0 ? pets[0].name : undefined;
       return {
         id: slug(owner),
         name: owner,
         initials: initialsOf(owner),
-        email: over?.email ?? `${slug(owner.split(' ')[0])}.${slug(owner.split(' ').slice(-1)[0])}@correo.com`,
+        email: '',
         phone: pets[0].phone,
         pets,
-        linkedAt: over?.linkedAt ?? today - (10 + (h % 320)) * DAY,
-        via: over ? over.via : claimed ? 'CLAIM' : 'QR',
-        claimedPet: over ? over.claimedPet : claimed,
+        linkedAt: 0,
+        via: 'QR',
         lastVisit: last.lastVisit,
         lastVisitAt: last.lastVisitAt,
         next,
@@ -119,17 +153,228 @@ export class ClinicStore {
     setInterval(() => this.now.set(Date.now()), 60_000);
   }
 
+  private get clinicId(): string | null {
+    return this.session.clinic()?.veterinaryId ?? null;
+  }
+
   patient(id: string): Patient | undefined {
     return this.patients().find((p) => p.id === id);
   }
 
   professional(id: string) {
-    return this.professionals.find((p) => p.id === id);
+    return this.professionalList().find((p) => p.id === id);
   }
 
-  // ---- Citas ----
+  /** ¿La persona que tiene la sesión es la dueña? Solo ella transfiere la propiedad. */
+  readonly iAmOwner = computed(() => this.members().some((m) => m.self && m.role === 'OWNER'));
+  readonly myRole = computed<MemberRole | null>(() => this.members().find((m) => m.self)?.role ?? null);
 
-  /** ¿El profesional ya tiene una cita activa que se cruce con este horario? */
+  // ---------------------------------------------------------------- Carga
+
+  /** Carga todo lo que tiene backend para la clínica actual. Los errores quedan en el estado de cada parte. */
+  load(): void {
+    const id = this.clinicId;
+    if (!id) return;
+    this.loadProfile().subscribe();
+    this.loadSubscription().subscribe();
+    this.loadTeam().subscribe();
+  }
+
+  /** Olvida todo (al cerrar sesión o cambiar de clínica). */
+  reset(): void {
+    this.profileDto.set(null);
+    this.profileState.set('idle');
+    this.subscription.set(null);
+    this.subscriptionState.set('idle');
+    this.members.set([]);
+    this.invitations.set([]);
+    this.teamState.set('idle');
+    this.linkCode.set(null);
+    this.patients.set([]);
+    this.appointments.set([]);
+    this.catalog.set([]);
+    this.schedule.set([]);
+    this.blocks.set([]);
+  }
+
+  loadProfile(): Observable<void> {
+    const id = this.clinicId;
+    if (!id) return EMPTY;
+    this.profileState.set('loading');
+    return this.clinicApi.profile(id).pipe(
+      tap((dto) => {
+        this.profileDto.set(dto);
+        this.profileState.set('ready');
+        if (dto.inviteCode) this.linkCode.set(dto.inviteCode);
+        // Si el estado de la clínica cambió (aprobada, suspendida), la sesión se entera.
+        this.session.patchClinic({ status: dto.status, veterinaryName: dto.name, city: dto.city });
+      }),
+      map(() => undefined),
+      catchError(() => {
+        this.profileState.set('error');
+        return of(undefined);
+      }),
+    );
+  }
+
+  loadSubscription(): Observable<void> {
+    const id = this.clinicId;
+    if (!id) return EMPTY;
+    this.subscriptionState.set('loading');
+    return this.clinicApi.activeSubscription(id).pipe(
+      tap((sub) => {
+        this.subscription.set(sub);
+        this.subscriptionState.set('ready');
+      }),
+      map(() => undefined),
+      catchError((e: unknown) => {
+        // Sin plan activo no es un error de la pantalla: simplemente no hay plan.
+        this.subscription.set(null);
+        this.subscriptionState.set(e instanceof ApiError && e.code === 'NO_ACTIVE_SUBSCRIPTION' ? 'ready' : 'error');
+        return of(undefined);
+      }),
+    );
+  }
+
+  /** Equipo + invitaciones + tarjeta profesional de quienes la tienen. */
+  loadTeam(): Observable<void> {
+    const id = this.clinicId;
+    if (!id) return EMPTY;
+    this.teamState.set('loading');
+    return this.teamApi.employees(id, true).pipe(
+      switchMap((employees) => {
+        const withProfile = employees.map((e) =>
+          hasProfessionalProfile(roleFromApi(e.role)) && e.active
+            ? this.teamApi.colleagueProfile(id, e.employeeId).pipe(catchError(() => of(null)))
+            : of(null),
+        );
+        return (withProfile.length ? forkJoin(withProfile) : of([])).pipe(map((profiles) => ({ employees, profiles })));
+      }),
+      tap(({ employees, profiles }) => {
+        this.members.set(employees.map((e, i) => memberFrom(e, profiles[i])));
+        const me = employees.find((e) => e.self);
+        if (me?.name) this.session.setFullName(me.name);
+        if (me) this.session.patchClinic({ role: me.role });
+      }),
+      switchMap(() => this.loadInvitations()),
+      tap(() => this.teamState.set('ready')),
+      map(() => undefined),
+      catchError(() => {
+        this.teamState.set('error');
+        return of(undefined);
+      }),
+    );
+  }
+
+  loadInvitations(): Observable<void> {
+    const id = this.clinicId;
+    if (!id) return EMPTY;
+    const names = new Map(this.members().map((m) => [m.userId, m.name]));
+    return this.teamApi.invitations(id, 'PENDING').pipe(
+      tap((list) => this.invitations.set(list.map((i) => invitationFrom(i, names)))),
+      map(() => undefined),
+      // Si la clínica aún no está aprobada, listar puede fallar: se deja vacío.
+      catchError(() => {
+        this.invitations.set([]);
+        return of(undefined);
+      }),
+    );
+  }
+
+  // ---------------------------------------------------------------- Equipo
+
+  invite(email: string, role: Exclude<MemberRole, 'OWNER'>): Observable<void> {
+    const id = this.clinicId!;
+    return this.teamApi.invite(id, email.trim().toLowerCase(), roleToApi(role)).pipe(switchMap(() => this.loadInvitations()));
+  }
+
+  resendInvitation(invitationId: string): Observable<void> {
+    return this.teamApi.resend(this.clinicId!, invitationId).pipe(switchMap(() => this.loadInvitations()));
+  }
+
+  cancelInvitation(invitationId: string): Observable<void> {
+    return this.teamApi.revoke(this.clinicId!, invitationId).pipe(switchMap(() => this.loadInvitations()));
+  }
+
+  changeRole(memberId: string, role: Exclude<MemberRole, 'OWNER'>): Observable<void> {
+    return this.teamApi.changeRole(this.clinicId!, memberId, roleToApi(role)).pipe(switchMap(() => this.loadTeam()));
+  }
+
+  /** Retira al empleado: queda inactivo y pierde el acceso en su siguiente petición. */
+  removeMember(memberId: string): Observable<void> {
+    return this.teamApi.removeEmployee(this.clinicId!, memberId).pipe(switchMap(() => this.loadTeam()));
+  }
+
+  /** La dueña pasa a administradora y el destino queda como dueño. Después hay que pedir un token de clínica nuevo. */
+  transferOwnership(memberId: string): Observable<void> {
+    const clinic = this.session.clinic();
+    return this.teamApi.transferOwnership(this.clinicId!, memberId).pipe(
+      switchMap(() => (clinic ? this.context.enter(clinic) : of(null))),
+      switchMap(() => this.loadTeam()),
+    );
+  }
+
+  leave(): Observable<void> {
+    return this.teamApi.leave(this.clinicId!);
+  }
+
+  // ---------------------------------------------------------------- Mi clínica
+
+  /** Guarda datos y configuración. Solo manda lo que cambió. */
+  updateProfile(patch: Partial<ClinicProfile>): Observable<void> {
+    const id = this.clinicId!;
+    const data = pickDefined({ name: patch.name, city: patch.city, phone: patch.phone, email: patch.email });
+    const settings = pickDefined({
+      allowOnlineBooking: patch.onlineBooking,
+      bookingRequiresConfirmation: patch.confirmEach,
+      cancellationMinHours: patch.minCancelHours,
+      defaultAppointmentMinutes: patch.defaultMinutes,
+      directoryVisible: patch.inDirectory,
+    });
+    const calls: Observable<unknown>[] = [];
+    if (Object.keys(data).length) calls.push(this.clinicApi.updateData(id, data));
+    if (Object.keys(settings).length) calls.push(this.clinicApi.updateSettings(id, settings));
+    return (calls.length ? forkJoin(calls) : of([])).pipe(switchMap(() => this.loadProfile()));
+  }
+
+  uploadLogo(file: File): Observable<void> {
+    return this.clinicApi.uploadLogo(this.clinicId!, file).pipe(
+      tap((res) => this.patchProfileDto({ logoUrl: res.logoUrl })),
+      map(() => undefined),
+    );
+  }
+
+  removeLogo(): Observable<void> {
+    return this.clinicApi.deleteLogo(this.clinicId!).pipe(
+      tap(() => this.patchProfileDto({ logoUrl: null })),
+      map(() => undefined),
+    );
+  }
+
+  /** Genera un código nuevo (el anterior deja de servir). */
+  generateLinkCode(): Observable<string> {
+    return this.clinicApi.generateInviteCode(this.clinicId!).pipe(
+      tap((res) => this.linkCode.set(res.inviteCode)),
+      map((res) => res.inviteCode ?? ''),
+    );
+  }
+
+  revokeLinkCode(): Observable<void> {
+    return this.clinicApi.deleteInviteCode(this.clinicId!).pipe(
+      tap(() => this.linkCode.set(null)),
+      map(() => undefined),
+    );
+  }
+
+  private patchProfileDto(patch: Partial<ClinicProfileDto>): void {
+    const dto = this.profileDto();
+    if (dto) this.profileDto.set({ ...dto, ...patch });
+  }
+
+  // ---------------------------------------------------------------- Sin backend todavía
+  // Estos métodos quedan para cuando existan los servicios de citas, pacientes y catálogo.
+  // Mientras no, las vistas no los llaman (ver `FEATURES` en el entorno).
+
   hasConflict(professionalId: string, start: number, minutes: number, ignoreId?: string): boolean {
     const end = start + minutes * 60_000;
     return this.appointments().some(
@@ -144,13 +389,7 @@ export class ClinicStore {
 
   addAppointment(input: NewAppointment): Appointment {
     const patient = this.patient(input.patientId)!;
-    const appointment: Appointment = {
-      id: `a-${Date.now()}`,
-      patientName: patient.name,
-      status: 'CONFIRMED',
-      source: 'CLINIC',
-      ...input,
-    };
+    const appointment: Appointment = { id: `a-${Date.now()}`, patientName: patient.name, status: 'CONFIRMED', source: 'CLINIC', ...input };
     this.appointments.update((list) => [...list, appointment]);
     return appointment;
   }
@@ -160,12 +399,14 @@ export class ClinicStore {
   }
 
   /**
-   * ¿La clínica atiende en ese horario? Devuelve el motivo si no: cerrado, fuera de horario o bloqueado
-   * (por un bloqueo de toda la clínica o del profesional).
+   * ¿La clínica atiende en ese horario? Devuelve el motivo si no: cerrado, fuera de horario o bloqueado.
+   * Si todavía no hay horario configurado, no se restringe nada.
    */
   unavailableReason(start: number, minutes: number, professionalId?: string): string | null {
+    const schedule = this.schedule();
+    if (!schedule.length) return null;
     const d = new Date(start);
-    const day = this.schedule().find((s) => s.day === (d.getDay() + 6) % 7);
+    const day = schedule.find((s) => s.day === (d.getDay() + 6) % 7);
     if (!day?.open) return 'Cerrado';
     const from = d.getHours() * 60 + d.getMinutes();
     const to = from + minutes;
@@ -175,25 +416,15 @@ export class ClinicStore {
       if (b.scope !== 'CLINIC' && b.scope !== professionalId) return false;
       const first = b.date;
       const lastDay = b.endDate ?? b.date;
-      const from = b.allDay ? first : at(first, b.from ?? '00:00');
+      const blockFrom = b.allDay ? first : at(first, b.from ?? '00:00');
       const until = b.allDay ? lastDay + DAY : at(first, b.to ?? '23:59');
-      return from < end && start < until;
+      return blockFrom < end && start < until;
     });
     return blocked ? 'Bloqueado' : null;
   }
 
-  // ---- Pacientes y clientes ----
-
   addPatient(input: NewPatient): Patient {
-    const patient: Patient = {
-      id: `p-${Date.now()}`,
-      ...input,
-      lastVisit: 'Sin visitas',
-      lastVisitService: '—',
-      lastVisitAt: 0,
-      vaccines: 'NONE',
-      inApp: false,
-    };
+    const patient: Patient = { id: `p-${Date.now()}`, ...input, lastVisit: 'Sin visitas', lastVisitService: '—', lastVisitAt: 0, vaccines: 'NONE', inApp: false };
     this.patients.update((list) => [patient, ...list]);
     return patient;
   }
@@ -203,65 +434,9 @@ export class ClinicStore {
     this.patients.update((list) => list.map((p) => (p.owner === owner ? { ...p, inApp: false } : p)));
   }
 
-  // ---- Pendientes ----
-
   notifyVaccine(patientId: string): void {
     this.notifiedVaccines.update((s) => new Set(s).add(patientId));
   }
-
-  // ---- Equipo ----
-
-  /** Devuelve el motivo si no se puede invitar. */
-  invite(email: string, role: MemberRole, invitedBy: string): string | null {
-    const e = email.trim().toLowerCase();
-    if (this.members().some((m) => m.email.toLowerCase() === e)) return 'Esa persona ya está en tu equipo.';
-    if (this.pendingInvitations().some((i) => i.email.toLowerCase() === e)) return 'Ya tiene una invitación pendiente. Puedes reenviarla.';
-    const now = Date.now();
-    // Si había una vencida para el mismo correo, se reemplaza.
-    this.invitations.update((list) => [...list.filter((i) => i.email.toLowerCase() !== e), { id: `i-${now}`, email: e, role, invitedBy, sentAt: now, expiresAt: now + 7 * DAY }]);
-    return null;
-  }
-
-  resendInvitation(id: string): void {
-    const now = Date.now();
-    this.invitations.update((list) => list.map((i) => (i.id === id ? { ...i, sentAt: now, expiresAt: now + 7 * DAY } : i)));
-  }
-
-  cancelInvitation(id: string): void {
-    this.invitations.update((list) => list.filter((i) => i.id !== id));
-  }
-
-  changeRole(memberId: string, role: MemberRole): void {
-    this.members.update((list) =>
-      list.map((m) => {
-        if (m.id !== memberId) return m;
-        const female = /a$/i.test(m.roleLabel);
-        const label = role === 'VET' ? (female ? 'Veterinaria' : 'Veterinario') : ROLE_LABEL[role];
-        return { ...m, role, roleLabel: label };
-      }),
-    );
-  }
-
-  setMemberActive(memberId: string, active: boolean): void {
-    this.members.update((list) => list.map((m) => (m.id === memberId ? { ...m, active } : m)));
-  }
-
-  setMemberSchedule(memberId: string, schedule: string): void {
-    this.members.update((list) => list.map((m) => (m.id === memberId ? { ...m, schedule } : m)));
-  }
-
-  /** La dueña actual pasa a administradora y el miembro elegido queda como dueño. */
-  transferOwnership(memberId: string): void {
-    this.members.update((list) =>
-      list.map((m) => {
-        if (m.id === memberId) return { ...m, role: 'OWNER', roleLabel: /a$/i.test(m.roleLabel) ? 'Dueña' : 'Dueño' };
-        if (m.role === 'OWNER') return { ...m, role: 'ADMIN', roleLabel: 'Administrador' };
-        return m;
-      }),
-    );
-  }
-
-  // ---- Servicios ----
 
   addService(input: Omit<ClinicService, 'id'>): ClinicService {
     const service: ClinicService = { id: `s-${Date.now()}`, ...input };
@@ -282,8 +457,6 @@ export class ClinicStore {
     return true;
   }
 
-  // ---- Horario y bloqueos ----
-
   setSchedule(days: ScheduleDay[]): void {
     this.schedule.set(days);
   }
@@ -296,21 +469,12 @@ export class ClinicStore {
     this.blocks.update((list) => list.filter((b) => b.id !== id));
   }
 
-  // ---- Mi clínica ----
-
-  updateProfile(patch: Partial<ClinicProfile>): void {
-    this.profile.update((p) => ({ ...p, ...patch }));
-  }
-
-  regenerateLinkCode(): string {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    const part = (n: number) => Array.from({ length: n }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
-    const code = `PATI-${part(4)}`;
-    this.linkCode.set(code);
-    return code;
-  }
-
-  revokeLinkCode(): void {
-    this.linkCode.set(null);
+  setMemberSchedule(memberId: string, schedule: string): void {
+    this.members.update((list) => list.map((m) => (m.id === memberId ? { ...m, schedule } : m)));
   }
 }
+
+function pickDefined<T extends object>(obj: T): Partial<T> {
+  return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined)) as Partial<T>;
+}
+

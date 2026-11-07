@@ -51,6 +51,18 @@
     </button>
   </div>
 
+  <div class="or" role="separator"><span>O</span></div>
+  <div class="social">
+    <div class="google-wrap">
+      <div class="google" [class.disabled]="loading() || googleLoading()" aria-hidden="true">
+        <img src="/brand/icon-google.png" alt="" width="18" height="18" />
+        {{ googleLoading() ? 'Conectando…' : 'Google' }}
+      </div>
+      <!-- El botón oficial de Google, invisible y encima: el clic real lo recibe él. -->
+      <div #googleHost class="google-host" aria-label="Ingresar con Google" [class.off]="loading() || googleLoading()"></div>
+    </div>
+  </div>
+
   <p class="register">
     ¿Tu clínica aún no está en MyAnimaLogVet?
     <a routerLink="/registro">Regístrala</a>

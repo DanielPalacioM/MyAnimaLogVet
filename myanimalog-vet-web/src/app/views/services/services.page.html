@@ -6,6 +6,8 @@
     <button type="button" class="vet-btn vet-btn--primary" (click)="newService()"><vet-icon name="plus" [size]="16" />Nuevo servicio</button>
   </header>
 
+  <vet-soon-note feature="catalog" />
+
   <div class="body">
     <section class="card catalog" aria-label="Catálogo de servicios">
       <div class="card-head">
@@ -28,6 +30,8 @@
             <button type="button" class="dots" [matMenuTriggerFor]="rowMenu" [matMenuTriggerData]="{ service: s }" [attr.aria-label]="'Más acciones de ' + s.name"><i></i><i></i><i></i></button>
           </span>
         </div>
+      } @empty {
+        <p class="empty">Todavía no hay servicios en el catálogo.</p>
       }
       <p class="note">Un servicio con citas no se borra: se desactiva, y las citas ya pedidas conservan su precio y duración.</p>
     </section>
@@ -44,6 +48,8 @@
             <span [class.closed]="!d.open">{{ svc.hours(d) }}</span>
             @if (d.day === svc.todayIndex()) { <em class="chip chip--today"><i></i>Hoy</em> }
           </div>
+        } @empty {
+          <p class="empty">Aún no hay un horario de atención configurado.</p>
         }
         <div class="line">
           <strong>Horarios por profesional</strong>

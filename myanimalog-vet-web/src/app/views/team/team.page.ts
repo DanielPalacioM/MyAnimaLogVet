@@ -5,6 +5,8 @@ import { ClinicStore } from '@services/clinic/clinic.store';
 import { fullDate } from '@services/clinic/date.utils';
 import { PanelActionsService } from '@services/panel/panel-actions.service';
 import { TeamFilter, TeamService } from '@services/team/team.service';
+import { errorMessage } from '@services/api-error';
+import { Observable } from 'rxjs';
 
 /** Equipo (Figma 1965:219): miembros, invitaciones pendientes y la ficha de cada persona. */
 @Component({
@@ -29,6 +31,11 @@ export class TeamPage implements OnInit {
   ngOnInit(): void {
     this.svc.setFilter('ALL');
     this.svc.selectedId.set(null);
+    this.reload();
+  }
+
+  protected reload(): void {
+    this.store.loadTeam().subscribe();
   }
 
   protected count(f: TeamFilter): number {
@@ -53,69 +60,62 @@ export class TeamPage implements OnInit {
   }
 
   protected joined(m: Member): string {
-    return fullDate(m.joinedAt);
+    return m.joinedAt ? fullDate(m.joinedAt) : '—';
   }
 
+  /** Reglas del backend: nadie se toca a sí mismo, al dueño no lo toca nadie y solo el dueño toca a un administrador. */
   protected canManage(m: Member): boolean {
-    return this.svc.iAmOwner() && m.role !== 'OWNER';
+    if (!this.svc.iCanManage() || m.self || m.role === 'OWNER') return false;
+    return m.role !== 'ADMIN' || this.svc.iAmOwner();
   }
 
   protected invite(): void {
     this.actions.invite();
   }
 
+  private run(call: Observable<unknown>, ok: string, then?: () => void): void {
+    call.subscribe({
+      next: () => {
+        this.actions.toast(ok);
+        then?.();
+      },
+      error: (e: unknown) => this.actions.toast(errorMessage(e)),
+    });
+  }
+
   protected resend(id: string, email: string): void {
-    this.store.resendInvitation(id);
-    this.actions.toast(`Invitación reenviada a ${email}`);
+    this.run(this.store.resendInvitation(id), `Invitación reenviada a ${email}`);
   }
 
   protected cancelInvitation(id: string, email: string): void {
     this.actions
-      .confirm({ title: 'Cancelar invitación', message: `${email} ya no podrá unirse con ese correo. Puedes invitarle de nuevo cuando quieras.`, confirmLabel: 'Cancelar invitación', danger: true })
-      .subscribe((ok) => {
-        if (!ok) return;
-        this.store.cancelInvitation(id);
-        this.actions.toast('Invitación cancelada');
-      });
+      .confirm({ title: 'Cancelar invitación', message: `${email} ya no podrá unirse con ese enlace. Puedes invitarle de nuevo cuando quieras.`, confirmLabel: 'Cancelar invitación', danger: true })
+      .subscribe((ok) => ok && this.run(this.store.cancelInvitation(id), 'Invitación cancelada'));
   }
 
   protected changeRole(m: Member): void {
     this.actions.changeRole(m).subscribe((role) => {
-      if (!role) return;
-      this.store.changeRole(m.id, role);
-      this.actions.toast(`${m.name} ahora es ${this.store.members().find((x) => x.id === m.id)?.roleLabel.toLowerCase()}`);
+      if (!role || role === 'OWNER') return;
+      this.run(this.store.changeRole(m.id, role), `El rol de ${m.name} cambió`);
     });
   }
 
   protected transfer(m: Member): void {
+    const first = m.name.split(' ')[0];
     this.actions
       .confirm({
         title: `¿Transferir la propiedad a ${m.name}?`,
-        message: `${m.name.split(' ')[0]} será quien administre la clínica y el plan, y tú pasarás a Administrador. Solo ${m.name.split(' ')[0]} podrá deshacerlo.`,
+        message: `${first} será quien administre la clínica y el plan, y tú pasarás a Administrador. El representante legal no cambia. Solo ${first} podrá deshacerlo.`,
         confirmLabel: 'Transferir propiedad',
         danger: true,
       })
-      .subscribe((ok) => {
-        if (!ok) return;
-        this.store.transferOwnership(m.id);
-        this.svc.selectedId.set(null);
-        this.actions.toast(`${m.name} es ahora quien dirige la clínica`);
-      });
+      .subscribe((ok) => ok && this.run(this.store.transferOwnership(m.id), `${m.name} es ahora quien dirige la clínica`, () => this.svc.selectedId.set(null)));
   }
 
   protected deactivate(m: Member): void {
     this.actions
-      .confirm({ title: `¿Desactivar a ${m.name}?`, message: 'Pierde el acceso a la clínica en máximo 15 minutos. Su historial y sus citas se conservan y puedes volver a activarle.', confirmLabel: 'Desactivar', danger: true })
-      .subscribe((ok) => {
-        if (!ok) return;
-        this.store.setMemberActive(m.id, false);
-        this.actions.toast(`${m.name} fue desactivado`);
-      });
-  }
-
-  protected activate(m: Member): void {
-    this.store.setMemberActive(m.id, true);
-    this.actions.toast(`${m.name} volvió a estar activo`);
+      .confirm({ title: `¿Retirar a ${m.name}?`, message: 'Pierde el acceso a la clínica en su siguiente petición. Su historial y lo que firmó se conservan. Para que vuelva, tendrás que invitarle de nuevo.', confirmLabel: 'Retirar', danger: true })
+      .subscribe((ok) => ok && this.run(this.store.removeMember(m.id), `${m.name} fue retirado del equipo`));
   }
 
   protected goSchedule(): void {

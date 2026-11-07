@@ -4,7 +4,7 @@ import { PAGE_SIZE, PatientSort, PatientsService, SpeciesTab } from '@services/p
 import { Appointment, STATUS_LABEL } from '@services/clinic/clinic.models';
 import { dayMonth, hourParts, longDate, sameDay } from '@services/clinic/date.utils';
 import { ClinicStore } from '@services/clinic/clinic.store';
-import { patientExtras, VACCINE } from '@services/clinic/patient-details';
+import { VACCINE } from '@services/clinic/patient-details';
 import { PanelActionsService } from '@services/panel/panel-actions.service';
 
 
@@ -37,7 +37,6 @@ export class PatientsPage implements OnInit {
   protected readonly vaccine = VACCINE;
   protected readonly statusLabel = STATUS_LABEL;
   protected readonly pageSize = PAGE_SIZE;
-  protected readonly extras = patientExtras;
 
   ngOnInit(): void {
     // Viene de la búsqueda del Inicio: /pacientes?q=...

@@ -1,0 +1,50 @@
+<header class="head">
+  <h1>Clínicas</h1>
+  <form class="search" role="search" (submit)="$event.preventDefault()">
+    <input type="search" [value]="search()" (input)="onSearch($any($event.target).value)" placeholder="Buscar por nombre, NIT o ciudad" aria-label="Buscar clínica" />
+  </form>
+</header>
+
+<div class="filters" role="group" aria-label="Filtrar por estado">
+  @for (f of filters; track f.label) {
+    <button type="button" class="filter" [class.on]="status() === f.value" [attr.aria-pressed]="status() === f.value" (click)="setStatus(f.value)">{{ f.label }}</button>
+  }
+</div>
+
+<section class="table" aria-label="Lista de clínicas">
+  <div class="tr hdr" role="row">
+    <span class="c-name">CLÍNICA</span><span class="c-city">CIUDAD</span><span class="c-state">ESTADO</span><span class="c-plan">PLAN</span><span class="c-date">APROBADA</span><span class="c-act">ACCIONES</span>
+  </div>
+  @if (loading() && !items().length) {
+    <p class="empty" role="status">Cargando clínicas…</p>
+  } @else if (error()) {
+    <div class="empty">
+      <p role="alert">{{ error() }}</p>
+      <button type="button" class="btn" (click)="load()">Reintentar</button>
+    </div>
+  } @else {
+    @for (c of items(); track c.id) {
+      <div class="tr">
+        <span class="c-name">{{ c.name }}</span>
+        <span class="c-city">{{ c.city }}</span>
+        <span class="c-state"><span class="chip" [ngClass]="chip(c).tone">{{ chip(c).label }}</span></span>
+        <span class="c-plan">{{ plan(c) }}</span>
+        <span class="c-date">{{ approved(c) }}</span>
+        <span class="c-act">
+          <button type="button" class="btn" (click)="open(c)" [attr.aria-label]="'Ver ficha de ' + c.name">Ver</button>
+          @switch (action(c)) {
+            @case ('SUSPEND') { <button type="button" class="btn btn--bad" (click)="run(c)" [attr.aria-label]="'Suspender ' + c.name">Suspender</button> }
+            @case ('REACTIVATE') { <button type="button" class="btn" (click)="run(c)" [attr.aria-label]="'Reactivar ' + c.name">Reactivar</button> }
+            @case ('REVIEW') { <button type="button" class="btn" (click)="run(c)" [attr.aria-label]="'Revisar ' + c.name">Revisar</button> }
+          }
+        </span>
+      </div>
+    } @empty {
+      <p class="empty">{{ search() || status() ? 'No encontramos clínicas con ese filtro.' : 'Todavía no hay clínicas registradas.' }}</p>
+    }
+  }
+</section>
+
+<p class="note">
+  Suspender pide un motivo y avisa al dueño de la clínica por correo. Mientras está suspendida, la clínica ve su información pero no puede agendar, registrar pacientes ni escribir en historias. Para aprobar una clínica nueva usa Revisar: la aprobación se hace en Verificaciones.
+</p>

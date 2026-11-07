@@ -1,0 +1,42 @@
+<header class="head">
+  <h1>Profesionales</h1>
+  <form class="search" role="search" (submit)="$event.preventDefault()">
+    <input type="search" [value]="search()" (input)="onSearch($any($event.target).value)" placeholder="Buscar por nombre o tarjeta profesional" aria-label="Buscar profesional" />
+  </form>
+</header>
+
+<div class="filters" role="group" aria-label="Filtrar profesionales">
+  <button type="button" class="filter" [class.on]="!verifiedOnly()" [attr.aria-pressed]="!verifiedOnly()" (click)="setVerified(false)">Todos</button>
+  <button type="button" class="filter" [class.on]="verifiedOnly()" [attr.aria-pressed]="verifiedOnly()" (click)="setVerified(true)">Verificados</button>
+</div>
+
+<section class="table" aria-label="Lista de profesionales">
+  <div class="tr hdr" role="row">
+    <span class="c-name">PROFESIONAL</span><span class="c-lic">TARJETA</span><span class="c-state">ESTADO</span><span class="c-clin">CLÍNICAS</span><span class="c-date">VERIFICADA</span><span class="c-act">ACCIONES</span>
+  </div>
+  @if (loading() && !items().length) {
+    <p class="empty" role="status">Cargando profesionales…</p>
+  } @else if (error()) {
+    <div class="empty">
+      <p role="alert">{{ error() }}</p>
+      <button type="button" class="btn" (click)="load()">Reintentar</button>
+    </div>
+  } @else {
+    @for (p of items(); track p.id) {
+      <div class="tr">
+        <span class="c-name">{{ p.fullName }} <small>{{ profession(p) }}</small></span>
+        <span class="c-lic">{{ p.licenseNumber }}</span>
+        <span class="c-state"><span class="chip" [ngClass]="chip(p).tone">{{ chip(p).label }}</span></span>
+        <span class="c-clin">{{ clinics(p) }}</span>
+        <span class="c-date">{{ verified(p) }}</span>
+        <span class="c-act"><button type="button" class="btn" (click)="open(p)" [attr.aria-label]="'Ver ficha de ' + p.fullName">Ver</button></span>
+      </div>
+    } @empty {
+      <p class="empty">{{ search() || verifiedOnly() ? 'No encontramos profesionales con ese filtro.' : 'Todavía no hay profesionales registrados.' }}</p>
+    }
+  }
+</section>
+
+<p class="note">
+  Aquí se consultan los veterinarios y su tarjeta profesional. Las tarjetas nuevas se revisan y aprueban en Verificaciones. El correo de cada profesional solo aparece en su ficha.
+</p>

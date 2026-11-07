@@ -14,6 +14,8 @@
     <button type="button" class="vet-btn vet-btn--primary" (click)="newAppointment()"><vet-icon name="plus" [size]="16" />Nueva cita</button>
   </header>
 
+  <vet-soon-note feature="appointments" />
+
   <div class="body">
     <aside class="left">
       <section class="card cal" aria-label="Calendario">
@@ -148,12 +150,11 @@
       @let p = patient(a);
       @let pro = professional(a.professionalId);
       @if (p) {
-        @let x = extras(p);
         <div class="ss-hero">
           <span class="ss-hero-av"><vet-icon name="paw" [size]="26" /></span>
           <div>
             <h2>{{ p.name }}</h2>
-            <p>{{ p.breed }} · {{ x.sex }} · {{ p.age }} · {{ x.weightKg }} kg</p>
+            <p>{{ p.species }} · {{ p.breed }} · {{ p.age }}</p>
           </div>
         </div>
         <div class="ss-chips">
@@ -191,12 +192,9 @@
           </div>
         }
         <div class="ss-hist-h">
-          <h3>Historial reciente</h3>
+          <span></span>
           <button type="button" class="ss-link" (click)="seeFile(p.name)">Ver ficha <vet-icon name="arrow" [size]="14" /></button>
         </div>
-        @for (e of x.history; track e.title) {
-          <div class="ss-hist"><time>{{ e.date }}</time><div><strong>{{ e.title }}</strong><small>{{ e.by }}</small></div></div>
-        }
       }
       <ng-container footer>
         @switch (a.status) {

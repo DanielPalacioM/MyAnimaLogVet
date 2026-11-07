@@ -3,6 +3,7 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatDialogRef } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { SessionService } from '@auth/services/session.service';
+import { errorMessage } from '@services/api-error';
 import { MemberRole } from '@services/clinic/clinic.models';
 import { ClinicStore } from '@services/clinic/clinic.store';
 import { VetField } from '../form-field/form-field.component';
@@ -27,7 +28,7 @@ import { RolePicker } from '../role-picker/role-picker.component';
         }
         <ng-container footer>
           <button type="button" class="btn btn--ghost" (click)="ref.close()">Cancelar</button>
-          <button type="submit" class="btn">Enviar invitación</button>
+          <button type="submit" class="btn" [disabled]="sending()">{{ sending() ? 'Enviando…' : 'Enviar invitación' }}</button>
         </ng-container>
       </vet-modal>
     </form>
@@ -59,17 +60,23 @@ export class InviteColleagueDialog {
     return this.session.clinic()?.veterinaryName ?? 'tu clínica';
   }
 
+  protected readonly sending = signal(false);
+
   protected send(): void {
     this.error.set('');
     this.form.markAllAsTouched();
-    if (this.form.invalid) return;
+    if (this.form.invalid || this.sending()) return;
     const email = this.form.controls.email.value.trim();
-    const problem = this.store.invite(email, this.role(), this.session.user()?.fullName ?? 'Administrador');
-    if (problem) {
-      this.error.set(problem);
-      return;
-    }
-    this.snack.open(`Invitación enviada a ${email}`, 'Cerrar', { duration: 3500 });
-    this.ref.close(true);
+    this.sending.set(true);
+    this.store.invite(email, this.role() as Exclude<MemberRole, 'OWNER'>).subscribe({
+      next: () => {
+        this.snack.open(`Invitación enviada a ${email}`, 'Cerrar', { duration: 3500 });
+        this.ref.close(true);
+      },
+      error: (e: unknown) => {
+        this.error.set(errorMessage(e));
+        this.sending.set(false);
+      },
+    });
   }
 }

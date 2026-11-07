@@ -1,0 +1,116 @@
+<header class="head">
+  <div>
+    <h1>Mi perfil profesional</h1>
+    <p class="lead">Tu tarjeta profesional se verifica una sola vez, aunque trabajes en varias clínicas.</p>
+  </div>
+  @if (profile()) {
+    <span class="chip" [ngClass]="status().tone">{{ status().label }}</span>
+  }
+</header>
+
+@if (loading() && !profile()) {
+  <p class="state" role="status">Cargando tu perfil…</p>
+} @else {
+  <p class="help">{{ profile() ? status().help : 'Todavía no tienes un perfil profesional. Completa tus datos para crearlo.' }}</p>
+
+  @if (error(); as message) {
+    <p class="alert alert--error" role="alert">{{ message }}</p>
+  }
+  @if (notice(); as message) {
+    <p class="alert alert--ok" role="status">{{ message }}</p>
+  }
+
+  <form class="card" [formGroup]="form" (ngSubmit)="save()" novalidate>
+    <h2>Tus datos</h2>
+    <div class="grid">
+      <vet-field label="Nombre completo" for="pp-name" [control]="form.controls.fullName">
+        <input id="pp-name" class="vet-input" type="text" autocomplete="name" formControlName="fullName" [attr.aria-invalid]="invalid(form.controls.fullName)" />
+      </vet-field>
+
+      <vet-field label="Profesión" for="pp-profession" [control]="form.controls.profession">
+        <select id="pp-profession" class="vet-input" formControlName="profession" [attr.aria-invalid]="invalid(form.controls.profession)">
+          <option value="" disabled>MV o MVZ</option>
+          @for (p of professions; track p.value) {
+            <option [value]="p.value">{{ p.label }}</option>
+          }
+        </select>
+      </vet-field>
+
+      <vet-field label="Tipo de documento" for="pp-id-type" [control]="form.controls.documentType">
+        <select id="pp-id-type" class="vet-input" formControlName="documentType">
+          @for (t of idTypes; track t.value) {
+            <option [value]="t.value">{{ t.label }}</option>
+          }
+        </select>
+      </vet-field>
+
+      <vet-field label="Número de documento" for="pp-id-number" [control]="form.controls.documentNumber">
+        <input id="pp-id-number" class="vet-input" type="text" inputmode="numeric" autocomplete="off" placeholder="Sin puntos ni espacios" formControlName="documentNumber" [attr.aria-invalid]="invalid(form.controls.documentNumber)" />
+      </vet-field>
+
+      <vet-field label="Tarjeta profesional" for="pp-license" [control]="form.controls.licenseNumber">
+        <input id="pp-license" class="vet-input" type="text" autocomplete="off" placeholder="Número de tarjeta" formControlName="licenseNumber" [attr.aria-invalid]="invalid(form.controls.licenseNumber)" />
+      </vet-field>
+
+      <vet-field label="Especialidad" for="pp-specialty" [optional]="true" [control]="form.controls.specialty">
+        <input id="pp-specialty" class="vet-input" type="text" placeholder="Ej. cirugía, felinos" formControlName="specialty" />
+      </vet-field>
+
+      <vet-field label="Universidad" for="pp-university" [optional]="true" [control]="form.controls.university">
+        <input id="pp-university" class="vet-input" type="text" placeholder="Dónde te graduaste" formControlName="university" />
+      </vet-field>
+    </div>
+
+    <div class="actions">
+      <button type="submit" class="vet-btn vet-btn--primary" [disabled]="saving() || locked()">
+        {{ saving() ? 'Guardando…' : profile() ? 'Guardar cambios' : 'Crear mi perfil' }}
+      </button>
+    </div>
+  </form>
+
+  @if (profile(); as p) {
+    <section class="card" aria-labelledby="docs-title">
+      <h2 id="docs-title">Documentos</h2>
+      <ul class="docs">
+        @for (row of rows(); track row.type) {
+          <li>
+            <vet-document-card
+              [title]="row.title"
+              [hint]="row.hint"
+              [state]="row.state"
+              [locked]="!canEditDocs() || busy() !== null"
+              (picked)="pick(row.type, $event)"
+            />
+            @if (row.documentId && canEditDocs()) {
+              <button type="button" class="link" [disabled]="busy() !== null" (click)="remove(row)" [attr.aria-label]="'Quitar ' + row.title">Quitar</button>
+            }
+          </li>
+        }
+      </ul>
+    </section>
+
+    <section class="card" aria-labelledby="sign-title">
+      <h2 id="sign-title">Firma <span class="optional">(opcional)</span></h2>
+      <p class="lead">Se usa para firmar tus registros clínicos. Solo PNG, hasta 1 MB. La puedes cambiar cuando quieras.</p>
+      <div class="sign">
+        <span class="chip" [ngClass]="hasSignature() ? 'ok' : 'mute'">{{ hasSignature() ? 'Firma cargada' : 'Sin firma' }}</span>
+        <label class="vet-btn vet-btn--secondary file">
+          {{ busy() === 'signature' ? 'Subiendo…' : hasSignature() ? 'Cambiar firma' : 'Subir firma' }}
+          <input type="file" accept=".png,image/png" class="vet-sr-only" [disabled]="busy() !== null" (change)="pickSignature($event)" />
+        </label>
+      </div>
+      @if (signatureError(); as message) {
+        <p class="alert alert--error" role="alert">{{ message }}</p>
+      }
+    </section>
+
+    <div class="submit">
+      <button type="button" class="vet-btn vet-btn--primary" [disabled]="!canSubmit() || submitting()" (click)="submit()">
+        {{ submitting() ? 'Enviando…' : 'Enviar a revisión' }}
+      </button>
+      @if (!canSubmit() && canEditDocs()) {
+        <small>Sube la tarjeta profesional y la cédula para poder enviarla.</small>
+      }
+    </div>
+  }
+}

@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, input, output, signal } from '@angular/core';
+import { afterNextRender, ChangeDetectionStrategy, Component, ElementRef, inject, input, output, signal, viewChild } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
@@ -21,9 +21,19 @@ export class LoginForm {
   readonly error = input<string | null>(null);
   /** Aviso informativo (p. ej. función aún no disponible). */
   readonly notice = input<string | null>(null);
+  /** Esperando la respuesta de Google. */
+  readonly googleLoading = input(false);
 
   readonly submitted = output<LoginCredentials>();
   readonly forgotPassword = output<void>();
+  /** Contenedor (invisible, sobre el botón "Google") donde la página pinta el botón oficial de Google. */
+  readonly googleHost = output<HTMLElement>();
+
+  private readonly host = viewChild.required<ElementRef<HTMLElement>>('googleHost');
+
+  constructor() {
+    afterNextRender(() => this.googleHost.emit(this.host().nativeElement));
+  }
 
   protected readonly showPassword = signal(false);
   protected readonly form = inject(FormBuilder).nonNullable.group({

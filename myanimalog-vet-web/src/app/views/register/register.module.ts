@@ -1,5 +1,6 @@
 import { NgModule } from '@angular/core';
-import { RegisterMockService } from '@services/register/register.mock.service';
+import { LoginHttpService } from '@services/login/login.http.service';
+import { RegisterHttpService } from '@services/register/register.http.service';
 import { RegisterService } from '@services/register/register.service';
 import { StepNavigator } from '@services/register/step-navigator';
 import { SharedModule } from '@shared/shared.module';
@@ -31,8 +32,8 @@ import { VerifyEmailPage } from './pages/verify-email/verify-email.page';
   imports: [SharedModule, RegisterRoutingModule],
   providers: [
     StepNavigator,
-    // Para pasar a HTTP: cambiar useClass por la implementación real.
-    { provide: RegisterService, useClass: RegisterMockService },
+    LoginHttpService,
+    { provide: RegisterService, useClass: RegisterHttpService },
   ],
 })
 export class RegisterModule {}

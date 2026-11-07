@@ -1,14 +1,21 @@
+@if (store.profileState() === 'error' && !store.profile()) {
+  <div class="page"><p class="state" role="alert">No pudimos cargar los datos de tu clínica. <button type="button" class="linkbtn" (click)="reload()">Reintentar</button></p></div>
+} @else if (!store.profile()) {
+  <div class="page"><p class="state" role="status">Cargando tu clínica…</p></div>
+} @else {
 <form class="page" [formGroup]="form" (ngSubmit)="save()" novalidate>
   <header class="head">
     <h1>Mi clínica</h1>
-    @if (verified()) {
+    @if (status() === 'SUSPENDED') {
+      <span class="pending pending--bad">Suspendida</span>
+    } @else if (verified()) {
       <span class="seal"><svg width="10" height="9" viewBox="0 0 10 9" fill="none" aria-hidden="true"><path d="M1 4.6 3.8 7.4 9 1.5" stroke="#1a1a2e" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>Clínica verificada</span>
     } @else {
-      <span class="pending">En revisión</span>
+      <span class="pending">{{ statusLabel() }}</span>
     }
     <span class="grow"></span>
     <button type="button" class="btn btn--soft" (click)="seeAsOwner()">Ver como dueño</button>
-    <button type="submit" class="vet-btn vet-btn--primary">Guardar cambios</button>
+    <button type="submit" class="vet-btn vet-btn--primary" [disabled]="saving()">{{ saving() ? 'Guardando…' : 'Guardar cambios' }}</button>
   </header>
 
   <div class="body">
@@ -26,11 +33,11 @@
               <small>PNG, JPG o WEBP · máximo 2 MB. Se ve en la app y en el directorio.</small>
               @if (logoError()) { <small class="err" role="alert">{{ logoError() }}</small> }
             </div>
-            <label class="btn btn--sm">
-              Cambiar
-              <input type="file" accept="image/png,image/jpeg,image/webp" (change)="pickLogo($event)" hidden />
+            <label class="btn btn--sm" [class.btn--disabled]="uploading()">
+              {{ uploading() ? 'Subiendo…' : 'Cambiar' }}
+              <input type="file" accept="image/png,image/jpeg,image/webp" (change)="pickLogo($event)" [disabled]="uploading()" hidden />
             </label>
-            <button type="button" class="quiet" (click)="removeLogo()" [disabled]="!logo()">Quitar</button>
+            <button type="button" class="quiet" (click)="removeLogo()" [disabled]="!logo() || uploading()">Quitar</button>
           </div>
 
           <div class="grid">
@@ -51,21 +58,21 @@
             </div>
             <div class="f">
               <label for="mc-city">Ciudad</label>
-              <select id="mc-city" class="box box--select" formControlName="city">
-                @for (c of cities; track c) { <option [value]="c">{{ c }}</option> }
-              </select>
+              <input id="mc-city" class="box" formControlName="city" [attr.aria-invalid]="err('city') ? 'true' : null" />
+              @if (err('city'); as e) { <small class="err" role="alert">{{ e }}</small> }
+              @if (store.profile()?.department) { <small class="hint-field">Departamento: {{ store.profile()?.department }}</small> }
             </div>
             <div class="f f--wide">
               <label for="mc-address">Dirección</label>
-              <input id="mc-address" class="box" formControlName="address" autocomplete="street-address" [attr.aria-invalid]="err('address') ? 'true' : null" />
-              @if (err('address'); as e) { <small class="err" role="alert">{{ e }}</small> }
+              <input id="mc-address" class="box box--ro" [value]="store.profile()?.address ?? ''" readonly />
+              <small class="hint-field">La dirección y el departamento se cambian escribiendo a soporte.</small>
             </div>
           </div>
 
-          <div #map class="map" (pointermove)="movePin($event, map)" (pointerdown)="movePin($event, map)" role="img" aria-label="Mapa con la ubicación de la clínica">
+          <div class="map" role="img" aria-label="Ubicación de la clínica">
             <i class="road road--h1"></i><i class="road road--h2"></i><i class="road road--v1"></i><i class="road road--v2"></i><i class="water"></i>
-            <i class="pin" [style.left.%]="pin().x" [style.top.%]="pin().y"></i>
-            <span class="map-help">Arrastra el pin si la ubicación no es exacta</span>
+            <i class="pin" style="left: 46%; top: 52%"></i>
+            <span class="map-help">{{ store.profile()?.address || 'Ubicación de la clínica' }}</span>
           </div>
         </div>
       </section>
@@ -86,7 +93,7 @@
         <div class="set">
           <span><strong>Cancelación con anticipación mínima</strong><small>Con menos tiempo, el dueño no puede cancelar desde la app.</small></span>
           <select class="sel" formControlName="minCancelHours" aria-label="Anticipación mínima para cancelar">
-            @for (h of cancelOptions; track h) { <option [ngValue]="h">{{ h }} {{ h === 1 ? 'hora' : 'horas' }}</option> }
+            @for (h of cancelOptions(); track h) { <option [ngValue]="h">{{ h }} {{ h === 1 ? 'hora' : 'horas' }}</option> }
           </select>
         </div>
         <div class="set">
@@ -106,7 +113,6 @@
       <section class="card" aria-labelledby="lc-title">
         <div class="card-head">
           <h2 id="lc-title">Código de vinculación</h2>
-          <span class="chip chip--soft">{{ svc.clientsCount() }} clientes</span>
         </div>
         <div class="code">
           @if (store.linkCode(); as code) {
@@ -115,11 +121,12 @@
             <p>Muéstralo en recepción: el dueño lo escanea desde MyAnimaLog y elige qué mascotas compartir.</p>
             <div class="code-btns">
               <button type="button" class="btn btn--primary" (click)="download(code)">Descargar QR</button>
-              <button type="button" class="btn btn--soft" (click)="regenerate()">Regenerar</button>
+              <button type="button" class="btn btn--soft" (click)="regenerate()" [disabled]="busyCode()">Regenerar</button>
             </div>
           } @else {
-            <p class="no-code">No hay un código activo: ningún dueño nuevo puede vincularse.</p>
-            <button type="button" class="btn btn--primary" (click)="regenerate()">Generar código</button>
+            <p class="no-code">Genera el código para que los dueños de mascotas se vinculen con tu clínica.</p>
+            <button type="button" class="btn btn--primary" (click)="regenerate()" [disabled]="busyCode()">{{ busyCode() ? 'Generando…' : 'Generar código' }}</button>
+            @if (!verified()) { <small class="hint-field">Los dueños solo pueden vincularse cuando la clínica esté aprobada.</small> }
           }
         </div>
         @if (store.linkCode()) {
@@ -143,15 +150,19 @@
                 <span>{{ values().name }}</span>
                 <span class="app-meta">
                   @if (verified()) { <em class="mini"><svg width="8" height="7" viewBox="0 0 10 9" fill="none" aria-hidden="true"><path d="M1 4.6 3.8 7.4 9 1.5" stroke="#1a1a2e" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>Verificada</em> }
-                  <small>{{ cityShort() }} · a 1,2 km</small>
+                  <small>{{ cityShort() }}</small>
                 </span>
               </div>
             </div>
-            <span class="app-open" [class.app-open--closed]="!svc.openNow().open">● {{ svc.openNow().text }}</span>
-            <div class="app-chips">
-              @for (c of visibleCategories(); track c) { <em class="chip chip--soft">{{ c }}</em> }
-              @if (extraCategories() > 0) { <em class="chip chip--soft">+{{ extraCategories() }}</em> }
-            </div>
+            @if (svc.hasSchedule()) {
+              <span class="app-open" [class.app-open--closed]="!svc.openNow().open">● {{ svc.openNow().text }}</span>
+            }
+            @if (visibleCategories().length) {
+              <div class="app-chips">
+                @for (c of visibleCategories(); track c) { <em class="chip chip--soft">{{ c }}</em> }
+                @if (extraCategories() > 0) { <em class="chip chip--soft">+{{ extraCategories() }}</em> }
+              </div>
+            }
             <span class="app-cta" [class.app-cta--off]="!values().onlineBooking">{{ values().onlineBooking ? 'Pedir cita' : 'Reservas en línea apagadas' }}</span>
           </div>
         </div>
@@ -160,13 +171,13 @@
       <section class="card" aria-labelledby="dl-title">
         <div class="card-head">
           <h2 id="dl-title">Datos legales</h2>
-          <span class="chip chip--teal"><i></i>Verificados</span>
+          @if (verified()) { <span class="chip chip--teal"><i></i>Verificados</span> }
         </div>
-        <div class="kv"><span>Razón social</span><strong>{{ svc.legal.businessName }}</strong></div>
-        <div class="kv"><span>NIT</span><strong>{{ svc.legal.nit }}</strong></div>
-        <div class="kv"><span>Representante legal</span><strong>{{ svc.legal.legalRep }}</strong></div>
+        <div class="kv"><span>Razón social</span><strong>{{ svc.legal().businessName || '—' }}</strong></div>
+        <div class="kv"><span>NIT</span><strong>{{ svc.legal().nit || '—' }}</strong></div>
         <p class="legal-note">Estos datos pasaron la verificación. Para cambiarlos escribe a soporte: el cambio requiere una nueva revisión.</p>
       </section>
     </div>
   </div>
 </form>
+}

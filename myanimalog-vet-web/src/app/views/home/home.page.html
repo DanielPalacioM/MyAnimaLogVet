@@ -117,10 +117,12 @@
           <h2 id="clinic-title">Mi clínica</h2>
           <button type="button" class="link" (click)="seePlan()">Ver plan <vet-icon name="arrow" [size]="14" /></button>
         </header>
-        <div class="meter"><span>{{ home.planLabel }}</span><strong>Renueva el {{ home.renewsOn() }}</strong></div>
-        <div class="bar" role="progressbar" aria-label="Avance del plan" [attr.aria-valuenow]="home.planProgress" aria-valuemin="0" aria-valuemax="100"><span [style.width.%]="home.planProgress"></span></div>
-        <div class="meter"><span>Espacio usado</span><strong>{{ home.storageUsedGb }} GB de {{ home.storageTotalGb }} GB</strong></div>
-        <div class="bar" role="progressbar" aria-label="Espacio usado" [attr.aria-valuenow]="home.storageUsedGb / home.storageTotalGb * 100" aria-valuemin="0" aria-valuemax="100"><span [style.width.%]="home.storageUsedGb / home.storageTotalGb * 100"></span></div>
+        @if (home.subscription(); as sub) {
+          <div class="meter"><span>{{ home.planLabel() }}</span><strong>{{ home.renewsOn() }}</strong></div>
+          <div class="bar" role="progressbar" aria-label="Avance del plan" [attr.aria-valuenow]="home.planProgress()" aria-valuemin="0" aria-valuemax="100"><span [style.width.%]="home.planProgress()"></span></div>
+        } @else {
+          <p class="empty">{{ home.planLabel() }}</p>
+        }
       </section>
     </div>
   </div>

@@ -26,6 +26,14 @@ export const LOGO_RULE: FileRule = {
   label: 'PNG, JPG o WEBP',
 };
 
+/** Firma del profesional: solo PNG, hasta 1 MB. */
+export const SIGNATURE_RULE: FileRule = {
+  types: ['image/png'],
+  extensions: ['png'],
+  maxBytes: 1 * MB,
+  label: 'PNG',
+};
+
 /** Devuelve el mensaje de error para el usuario, o `null` si el archivo cumple la regla. */
 export function validateFile(file: File, rule: FileRule): string | null {
   const extension = file.name.split('.').pop()?.toLowerCase() ?? '';

@@ -3,7 +3,9 @@
     [loading]="loading()"
     [error]="error()"
     [notice]="notice()"
+    [googleLoading]="googleLoading()"
     (submitted)="signIn($event)"
+    (googleHost)="listenGoogle($event)"
     (forgotPassword)="notice.set('La recuperación de contraseña estará disponible pronto.')"
   />
 </vet-auth-shell>

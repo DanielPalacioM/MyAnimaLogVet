@@ -1,9 +1,10 @@
 import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
+import { managerGuard } from '@auth/guards/auth.guard';
 import { PanelLayout } from './layout/panel.layout';
 import { ComingSoonPage } from './pages/coming-soon/coming-soon.page';
 
-const soon = (path: string, title: string) => ({ path, component: ComingSoonPage, data: { title }, title: `${title} · MyAnimaLogVet` });
+const soon = (path: string, title: string) => ({ path, canActivate: [managerGuard], component: ComingSoonPage, data: { title }, title: `${title} · MyAnimaLogVet` });
 
 /** Panel: cada sección se carga bajo demanda. Las que aún no existen muestran "Pronto". */
 const routes: Routes = [
@@ -20,8 +21,9 @@ const routes: Routes = [
       soon('reportes', 'Reportes'),
       { path: 'equipo', title: 'Equipo · MyAnimaLogVet', loadChildren: () => import('../team/team.module').then((m) => m.TeamModule) },
       { path: 'servicios', title: 'Servicios y horarios · MyAnimaLogVet', loadChildren: () => import('../services/services.module').then((m) => m.ServicesModule) },
-      { path: 'mi-clinica', title: 'Mi clínica · MyAnimaLogVet', loadChildren: () => import('../clinic/clinic.module').then((m) => m.ClinicModule) },
-      soon('plan', 'Plan'),
+      { path: 'mi-clinica', canActivate: [managerGuard], title: 'Mi clínica · MyAnimaLogVet', loadChildren: () => import('../clinic/clinic.module').then((m) => m.ClinicModule) },
+      { path: 'mi-perfil', title: 'Mi perfil profesional · MyAnimaLogVet', loadChildren: () => import('../profile/profile.module').then((m) => m.ProfileModule) },
+      { path: 'plan', canActivate: [managerGuard], title: 'Plan · MyAnimaLogVet', loadChildren: () => import('../plan/plan.module').then((m) => m.PlanModule) },
     ],
   },
 ];

@@ -4,11 +4,11 @@ import { AbstractControl, FormBuilder, Validators } from '@angular/forms';
 import { ChoiceOption } from '@shared/components/choice-cards/choice-cards.component';
 import { startWith } from 'rxjs';
 import { DOCUMENT_SPECS } from '@services/register/models/documents.model';
-import { DocumentType, Profession, YesNo } from '@services/register/models/registration.model';
+import { DocumentType, IdDocumentType, Profession, YesNo } from '@services/register/models/registration.model';
 import { RegistrationStore } from '@services/register/registration.store';
 import { StepNavigator } from '@services/register/step-navigator';
 import { focusFirstInvalid } from '@shared/utils/focus-first-invalid';
-import { licenseNumberValidator } from '@shared/validators/common';
+import { digitsOnly, documentNumberValidator, licenseNumberValidator } from '@shared/validators/common';
 
 /**
  * Container: Paso 5 · Perfil profesional (Figma 1910:131). Verificación de quien firma historias clínicas.
@@ -41,7 +41,17 @@ export class ProfilePage {
     { value: 'MVZ', label: 'Médico veterinario zootecnista (MVZ)' },
   ];
 
+  /** Si el representante legal es otra persona, la cédula de quien registra se pide aquí. */
+  protected readonly needsOwnId = this.store.draft().legalRep.isSelf !== 'yes';
+  protected readonly documentTypes: readonly { value: IdDocumentType; label: string }[] = [
+    { value: 'CC', label: 'Cédula de ciudadanía' },
+    { value: 'CE', label: 'Cédula de extranjería' },
+    { value: 'PPT', label: 'Permiso por protección temporal' },
+  ];
+
   protected readonly form = inject(FormBuilder).nonNullable.group({
+    idType: [this.store.draft().profile.idType as IdDocumentType, [Validators.required]],
+    idNumber: [this.store.draft().profile.idNumber, [Validators.required, documentNumberValidator]],
     isVeterinarian: [this.store.draft().profile.isVeterinarian as YesNo | null, [Validators.required]],
     profession: [this.store.draft().profile.profession as Profession | '', [Validators.required]],
     licenseNumber: [this.store.draft().profile.licenseNumber, [Validators.required, licenseNumberValidator]],
@@ -63,6 +73,10 @@ export class ProfilePage {
     this.form.controls.isVeterinarian.valueChanges
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((value) => this.applyMode(value));
+    this.form.controls.idNumber.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((value) => {
+      const clean = digitsOnly(value ?? '').slice(0, 12);
+      if (clean !== value) this.form.controls.idNumber.setValue(clean, { emitEvent: false });
+    });
   }
 
   protected invalid(control: AbstractControl): boolean {
@@ -93,6 +107,8 @@ export class ProfilePage {
     // Primero se guarda la respuesta: los documentos que faltan dependen de si es veterinario.
     this.store.patch('profile', {
       isVeterinarian: v.isVeterinarian,
+      idType: isVet && this.needsOwnId ? v.idType : 'CC',
+      idNumber: isVet && this.needsOwnId ? digitsOnly(v.idNumber) : '',
       profession: isVet ? v.profession : '',
       licenseNumber: isVet ? v.licenseNumber.trim().toUpperCase() : '',
       specialty: isVet ? v.specialty.trim() : '',
@@ -110,9 +126,11 @@ export class ProfilePage {
   /** Solo quien es veterinario llena profesión y tarjeta; para los demás esos campos no aplican. */
   private applyMode(value: YesNo | null): void {
     const { profession, licenseNumber, specialty, university } = this.form.controls;
-    const fields = [profession, licenseNumber, specialty, university];
+    const { idType, idNumber } = this.form.controls;
+    const fields = [profession, licenseNumber, specialty, university, ...(this.needsOwnId ? [idType, idNumber] : [])];
     if (value === 'yes') fields.forEach((c) => c.enable({ emitEvent: false }));
     else fields.forEach((c) => c.disable({ emitEvent: false }));
+    if (!this.needsOwnId) [idType, idNumber].forEach((c) => c.disable({ emitEvent: false }));
     this.error.set(null);
   }
 }

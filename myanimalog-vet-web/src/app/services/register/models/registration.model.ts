@@ -88,6 +88,9 @@ export interface LegalRepData {
 
 export interface ProfileData {
   isVeterinarian: YesNo | null;
+  /** Cédula de quien registra. Solo se pide si el representante legal es otra persona. */
+  idType: IdDocumentType;
+  idNumber: string;
   profession: Profession | '';
   licenseNumber: string;
   specialty: string;
@@ -131,7 +134,7 @@ export function emptyDraft(): RegistrationDraft {
       longitude: null,
     },
     legalRep: { isSelf: null, fullName: '', documentType: 'CC', documentNumber: '' },
-    profile: { isVeterinarian: null, profession: '', licenseNumber: '', specialty: '', university: '' },
+    profile: { isVeterinarian: null, idType: 'CC', idNumber: '', profession: '', licenseNumber: '', specialty: '', university: '' },
     declaration: false,
     flags: { accountCreated: false, emailVerified: false },
     completed: [],
@@ -168,7 +171,8 @@ export interface RegistrationSubmission {
   documents: Partial<Record<DocumentType, File>>;
 }
 
-export type VerificationStatus = 'UNDER_REVIEW' | 'NEEDS_CORRECTION' | 'ACTIVE' | 'REJECTED';
+/** `DRAFT`: la solicitud está abierta para subir documentos (p. ej. tras reintentar una rechazada). */
+export type VerificationStatus = 'DRAFT' | 'UNDER_REVIEW' | 'NEEDS_CORRECTION' | 'ACTIVE' | 'REJECTED';
 
 export interface RegistrationReceipt {
   requestId: string;

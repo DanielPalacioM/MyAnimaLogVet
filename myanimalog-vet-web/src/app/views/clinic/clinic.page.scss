@@ -96,3 +96,10 @@ h2 { margin: 0; color: #1a1a2e; font: 700 15px/1.3 'Afacad', sans-serif; }
 .legal-note { margin: 0; padding: 14px 20px; background: #f7f6ff; color: #4a4860; font: 500 12px/1.35 'Afacad', sans-serif; }
 
 @media (max-width: 1100px) { .body { grid-template-columns: 1fr; } }
+
+.state { margin: 0; color: #4a4860; font: 500 14px/1.4 'Afacad', sans-serif; }
+.linkbtn { padding: 0; border: 0; background: none; color: #4037be; font: 700 14px/1.4 'Afacad', sans-serif; cursor: pointer; }
+.hint-field { color: #8a8a9a; font: 500 12px/1.3 'Afacad', sans-serif; }
+.box--ro { background: #f7f6ff; color: #4a4860; }
+.btn--disabled { opacity: 0.6; pointer-events: none; }
+.pending--bad { background: #fef3f2; color: #b42318; }

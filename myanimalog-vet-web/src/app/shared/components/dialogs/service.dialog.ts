@@ -81,10 +81,10 @@ export class ServiceDialog {
   protected readonly form = inject(FormBuilder).nonNullable.group({
     name: [this.service?.name ?? '', [Validators.required, Validators.minLength(2), (c: { value: string }) => this.taken(c.value)]],
     category: [(this.service?.category ?? 'Consulta') as ServiceCategory, [Validators.required]],
-    minutes: [this.service?.minutes ?? this.store.profile().defaultMinutes, [Validators.required, Validators.min(5), Validators.max(480)]],
+    minutes: [this.service?.minutes ?? this.store.profile()?.defaultMinutes ?? 30, [Validators.required, Validators.min(5), Validators.max(480)]],
     price: [this.service?.price ?? 0, [Validators.required, Validators.min(0)]],
     online: [this.service?.online ?? true],
-    professionalIds: [this.service?.professionalIds ?? [this.store.professionals[0].id]],
+    professionalIds: [this.service?.professionalIds ?? (this.store.professionals[0] ? [this.store.professionals[0].id] : [])],
   });
 
   private taken(name: string) {

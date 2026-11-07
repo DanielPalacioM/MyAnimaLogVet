@@ -1,0 +1,47 @@
+<vet-auth-shell side="left">
+  <section class="inv">
+    @if (loading()) {
+      <p class="lead" role="status">Abriendo tu invitación…</p>
+    } @else if (invitation(); as i) {
+      <h1>Te invitaron a un equipo</h1>
+
+      <div class="clinic">
+        <span class="av">{{ initials() }}</span>
+        <span class="txt">
+          <strong>{{ i.veterinaryName ?? 'Una clínica' }}</strong>
+          @if (i.veterinaryCity) { <small>{{ i.veterinaryCity }}</small> }
+        </span>
+      </div>
+
+      <p class="meta">Rol: <strong>{{ roleText() }}</strong>@if (i.invitedByName) { · Invitó: <strong>{{ i.invitedByName }}</strong> }</p>
+
+      <h2>Como {{ roleText() }} podrás</h2>
+      <ul class="can">
+        @for (c of can(); track c) { <li>{{ c }}</li> }
+      </ul>
+
+      @if (blocked(); as why) {
+        <p class="alert" role="alert">{{ why }}</p>
+        @if (!i.emailMatchesCaller) {
+          <button type="button" class="vet-btn vet-btn--secondary" (click)="signOut()">Cerrar sesión</button>
+        } @else {
+          <a class="vet-btn vet-btn--secondary" routerLink="/elegir-clinica">Ir a mis clínicas</a>
+        }
+      } @else {
+        <p class="note">La invitación es para <strong>{{ i.email }}</strong>. Si entraste con otra cuenta, cierra sesión y entra con ese correo.</p>
+        <div class="btns">
+          <button type="button" class="vet-btn vet-btn--secondary" (click)="decline()" [disabled]="busy()">Rechazar</button>
+          <button type="button" class="vet-btn vet-btn--primary" (click)="accept()" [disabled]="busy()">{{ busy() ? 'Entrando…' : 'Aceptar y entrar' }}</button>
+        </div>
+        <p class="foot">Vence el {{ expiresText() }}. Si no la aceptas, la clínica puede reenviarla.</p>
+      }
+    } @else {
+      <h1>Invitación</h1>
+    }
+
+    @if (error()) {
+      <p class="alert" role="alert">{{ error() }}</p>
+      <a class="more" routerLink="/elegir-clinica">Ir a mis clínicas</a>
+    }
+  </section>
+</vet-auth-shell>

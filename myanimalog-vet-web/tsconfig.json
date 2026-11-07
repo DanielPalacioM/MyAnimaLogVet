@@ -18,7 +18,8 @@
       "@auth/*": ["src/app/auth/*"],
       "@shared/*": ["src/app/shared/*"],
       "@services/*": ["src/app/services/*"],
-      "@views/*": ["src/app/views/*"]
+      "@views/*": ["src/app/views/*"],
+      "@env/*": ["src/environments/*"]
     },
     "module": "preserve"
   },

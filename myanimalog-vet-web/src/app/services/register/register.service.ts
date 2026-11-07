@@ -3,17 +3,32 @@ import { Observable } from 'rxjs';
 import {
   AccountInput,
   ClinicAvailability,
+  DocumentType,
   ClinicAvailabilityQuery,
   RegistrationReceipt,
   RegistrationSubmission,
   VerificationStatus,
 } from './models/registration.model';
 
+/** Un documento de la solicitud, tal como lo informa `GET /{id}/verification`. */
+export interface VerificationDocument {
+  type: DocumentType;
+  required: boolean;
+  /** `PENDING` sin subir · `READY` subido · `NEEDS_CORRECTION` pedido por el revisor · `REVIEWED` ya aprobado. */
+  status: 'PENDING' | 'READY' | 'NEEDS_CORRECTION' | 'REVIEWED';
+  fileName: string | null;
+}
+
 export interface VerificationSummary {
   requestId: string;
   status: VerificationStatus;
   /** ISO 8601. */
   submittedAt: string;
+  /** Nota del revisor (corrección o rechazo). */
+  note?: string | null;
+  attemptsRemaining?: number;
+  maxAttempts?: number;
+  documents?: VerificationDocument[];
 }
 
 /**
@@ -41,5 +56,12 @@ export abstract class RegisterService {
    */
   abstract submitRegistration(submission: RegistrationSubmission): Observable<RegistrationReceipt>;
 
-  abstract getVerification(requestId: string): Observable<VerificationSummary>;
+  /** Estado de la solicitud. `clinicId` sirve cuando no hay token de clínica (p. ej. una clínica rechazada). */
+  abstract getVerification(requestId: string, clinicId?: string): Observable<VerificationSummary>;
+
+  /** Abre un intento nuevo de una solicitud rechazada (`POST /verification/retry`). Hay que volver a subir los documentos. */
+  abstract retryVerification(clinicId?: string): Observable<void>;
+
+  /** Sube solo los documentos dados y reenvía a revisión (corrección, o intento nuevo después de reintentar). */
+  abstract resubmitDocuments(files: Partial<Record<DocumentType, File>>, clinicId?: string): Observable<void>;
 }

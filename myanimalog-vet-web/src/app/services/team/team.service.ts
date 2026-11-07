@@ -1,6 +1,5 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
-import { SessionService } from '@auth/services/session.service';
-import { Invitation, LicenseState, Member, MemberRole } from '../clinic/clinic.models';
+import { Invitation, LicenseState, Member, MemberRole, ROLE_LABEL } from '../clinic/clinic.models';
 import { ClinicStore } from '../clinic/clinic.store';
 
 export type TeamFilter = 'ALL' | 'ACTIVE' | 'INACTIVE';
@@ -10,7 +9,7 @@ const DAY = 86_400_000;
 export interface InvitationRow {
   invitation: Invitation;
   roleLabel: string;
-  /** "Invitada por Ana Gómez". */
+  /** "Invitada por Ana Gómez" (vacío si no se sabe quién invitó). */
   by: string;
   expired: boolean;
   /** "Vence en 5 días". */
@@ -21,11 +20,11 @@ export interface InvitationRow {
 @Injectable({ providedIn: 'root' })
 export class TeamService {
   private readonly store = inject(ClinicStore);
-  private readonly session = inject(SessionService);
 
   readonly filter = signal<TeamFilter>('ALL');
   readonly selectedId = signal<string | null>(null);
 
+  readonly state = this.store.teamState;
   readonly members = this.store.members;
   readonly selected = computed(() => this.members().find((m) => m.id === this.selectedId()) ?? null);
 
@@ -45,15 +44,13 @@ export class TeamService {
   readonly invitationRows = computed<InvitationRow[]>(() => {
     const now = this.store.now();
     return this.store.invitations().map((i) => {
-      const expired = i.expiresAt <= now;
-      // Recién enviada, el reloj puede ir unos segundos atrás: se cuenta desde el envío.
       const days = Math.ceil((i.expiresAt - Math.max(now, i.sentAt)) / DAY);
       const first = i.email.split('@')[0].split(/[._]/)[0];
       return {
         invitation: i,
-        roleLabel: i.role === 'VET' ? 'Veterinario' : i.role === 'ASSISTANT' ? 'Auxiliar' : i.role === 'RECEPTION' ? 'Recepción' : i.role === 'ADMIN' ? 'Administrador' : 'Dueño',
-        by: `${/a$/i.test(first) ? 'Invitada' : 'Invitado'} por ${i.invitedBy}`,
-        expired,
+        roleLabel: ROLE_LABEL[i.role],
+        by: i.invitedBy ? `${/a$/i.test(first) ? 'Invitada' : 'Invitado'} por ${i.invitedBy}` : '',
+        expired: i.expired,
         expiresIn: days <= 0 ? 'Vence hoy' : `Vence en ${days} ${days === 1 ? 'día' : 'días'}`,
       };
     });
@@ -61,17 +58,21 @@ export class TeamService {
 
   /** La persona que tiene la sesión (se marca con "(tú)"). */
   isMe(m: Member): boolean {
-    return m.name === this.session.user()?.fullName;
+    return m.self;
   }
 
-  /** ¿Quien tiene la sesión es la dueña? Solo ella transfiere la propiedad y cambia roles. */
-  readonly iAmOwner = computed(() => this.members().some((m) => m.role === 'OWNER' && m.name === this.session.user()?.fullName));
+  /** ¿Quien tiene la sesión es la dueña? Solo ella transfiere la propiedad. */
+  readonly iAmOwner = this.store.iAmOwner;
+  /** Quien puede cambiar roles y retirar: dueña y administradores. */
+  readonly iCanManage = computed(() => this.store.myRole() === 'OWNER' || this.store.myRole() === 'ADMIN');
 
   /** Qué ve en la columna "Historia clínica". */
   clinicalAccess(m: Member): { text: string; tone: 'ok' | 'warn' | 'plain' | 'muted' } {
     if (!m.active) return { text: '—', tone: 'muted' };
     if (m.license === 'VERIFIED') return { text: 'Escribe historia', tone: 'ok' };
     if (m.license === 'IN_REVIEW') return { text: 'Pendiente de tarjeta', tone: 'warn' };
+    if (m.license === 'MISSING') return { text: 'Sin tarjeta', tone: 'warn' };
+    if (m.license === 'REJECTED') return { text: 'Tarjeta rechazada', tone: 'warn' };
     return m.role === 'RECEPTION' ? { text: 'Datos básicos', tone: 'plain' } : { text: 'Solo enfermería', tone: 'plain' };
   }
 
@@ -84,7 +85,7 @@ export class TeamService {
           return [
             { text: 'Configurar la clínica y gestionar el equipo' },
             { text: 'Ver reportes y el plan' },
-            ...(license === 'VERIFIED' ? [{ text: 'Escribir historia clínica' }] : []),
+            ...(license === 'VERIFIED' ? [{ text: 'Escribir historia clínica' }] : [{ text: 'Escribir historia clínica: cuando se verifique la tarjeta', pending: true }]),
           ];
         case 'VET':
           return license === 'VERIFIED'

@@ -9,6 +9,8 @@
     <button type="button" class="vet-btn vet-btn--primary" (click)="showQr()"><vet-icon name="qr" [size]="16" />Mostrar código QR</button>
   </header>
 
+  <vet-soon-note feature="patients" />
+
   <div class="filters">
     <div class="tabs" role="group" aria-label="Filtro">
       @for (f of filters; track f.value) {

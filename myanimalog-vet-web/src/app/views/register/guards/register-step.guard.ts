@@ -1,6 +1,7 @@
 import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
 import { STATUS_PATH, StepId, stepInfo } from '@services/register/models/registration.model';
+import { SessionService } from '@auth/services/session.service';
 import { RegistrationStore } from '@services/register/registration.store';
 
 /**
@@ -18,8 +19,13 @@ export function stepGuard(step: StepId): CanActivateFn {
   };
 }
 
-/** La pantalla de estado solo existe después de enviar la solicitud. */
-export const statusGuard: CanActivateFn = () => {
+/**
+ * La pantalla de estado existe después de enviar la solicitud, para quien ya trabaja con una clínica,
+ * o con `?clinica=<id>` (una clínica rechazada o en corrección no tiene token de clínica: se consulta con el normal).
+ */
+export const statusGuard: CanActivateFn = (route) => {
   const store = inject(RegistrationStore);
-  return store.submitted() ? true : inject(Router).createUrlTree(['/registro']);
+  const session = inject(SessionService);
+  const byQuery = session.isAuthenticated() && !!route.queryParamMap.get('clinica');
+  return store.submitted() || session.hasClinic() || byQuery ? true : inject(Router).createUrlTree(['/registro']);
 };

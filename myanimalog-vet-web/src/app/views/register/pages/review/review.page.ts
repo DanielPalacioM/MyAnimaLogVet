@@ -1,7 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormBuilder, Validators } from '@angular/forms';
-import { SessionService } from '@auth/services/session.service';
-import { TokenService } from '@auth/services/token.service';
 import { errorMessage } from '@services/api-error';
 import { RegisterService } from '@services/register/register.service';
 import { RegistrationStore } from '@services/register/registration.store';
@@ -34,8 +32,6 @@ export class ReviewPage {
   private readonly api = inject(RegisterService);
   private readonly store = inject(RegistrationStore);
   private readonly nav = inject(StepNavigator);
-  private readonly session = inject(SessionService);
-  private readonly tokens = inject(TokenService);
 
   protected readonly sending = signal(false);
   protected readonly error = signal<string | null>(null);
@@ -106,20 +102,7 @@ export class ReviewPage {
     this.error.set(null);
     this.api.submitRegistration(submission).subscribe({
       next: (receipt) => {
-        // Con la solicitud enviada ya puede entrar al panel (con la clínica en revisión).
-        this.tokens.save({ accessToken: `mock-access-${receipt.userId}`, refreshToken: `mock-refresh-${receipt.userId}` });
-        this.session.signIn({
-          userId: receipt.userId,
-          fullName: account.fullName,
-          email: account.email,
-          clinic: {
-            veterinaryId: receipt.veterinaryId,
-            veterinaryName: receipt.veterinaryName,
-            status: 'UNDER_REVIEW',
-            requestId: receipt.requestId,
-            submittedAt: receipt.submittedAt,
-          },
-        });
+        // La sesión y el token de clínica ya quedaron guardados durante el envío: entra al panel con la clínica en revisión.
         this.store.recordSubmission(receipt);
         this.nav.goToStatus();
       },

@@ -4,7 +4,7 @@ import { Appointment, AppointmentStatus, STATUS_COLOR, STATUS_LABEL } from '@ser
 import { ClinicStore } from '@services/clinic/clinic.store';
 import { cap, longDate, monthName, sameDay, startOfDay, timeLabel } from '@services/clinic/date.utils';
 import { Router } from '@angular/router';
-import { SERVICE_PRICE, money, patientExtras } from '@services/clinic/patient-details';
+import { money } from '@services/clinic/patient-details';
 import { PanelActionsService } from '@services/panel/panel-actions.service';
 
 interface MonthCell {
@@ -187,10 +187,9 @@ export class AgendaPage {
     this.change(a, 'CANCELLED', `Solicitud de ${a.patientName} rechazada`);
   }
 
-  protected extras = patientExtras;
-
   protected price(service: string): string {
-    return money(SERVICE_PRICE[service] ?? 50_000);
+    const found = this.store.catalog().find((s) => s.name === service);
+    return found ? money(found.price) : 'Sin precio';
   }
 
   protected minutesUntil(a: Appointment): number {

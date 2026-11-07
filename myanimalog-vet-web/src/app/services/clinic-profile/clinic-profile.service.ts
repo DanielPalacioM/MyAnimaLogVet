@@ -1,6 +1,5 @@
 import { computed, inject, Injectable } from '@angular/core';
 import { ClinicStore } from '../clinic/clinic.store';
-import { LEGAL } from '../clinic/clinic-settings.seed';
 import { addDays, at, startOfDay } from '../clinic/date.utils';
 
 const label = (hhmm: string): string => {
@@ -15,9 +14,14 @@ const STOP = new Set(['clinica', 'clínica', 'veterinaria', 'veterinario', 'de',
 export class ClinicProfileService {
   private readonly store = inject(ClinicStore);
 
-  readonly legal = LEGAL;
+  /** Datos legales (los del registro, ya verificados). */
+  readonly legal = computed(() => {
+    const p = this.store.profile();
+    return { businessName: p?.legalName ?? '', nit: p?.nit ?? '' };
+  });
   readonly profile = this.store.profile;
-  readonly clientsCount = computed(() => this.store.clients().length);
+  /** Si todavía no hay horario cargado, no se muestra el estado abierto/cerrado en la vista previa. */
+  readonly hasSchedule = computed(() => this.store.schedule().length > 0);
 
   /** Letra del logo: la primera palabra que no sea "Clínica Veterinaria". */
   initial(name: string): string {

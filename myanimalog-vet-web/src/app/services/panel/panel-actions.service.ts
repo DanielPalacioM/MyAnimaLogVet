@@ -1,7 +1,9 @@
 import { inject, Injectable } from '@angular/core';
 import { MatDialog, MatDialogConfig } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { map, Observable } from 'rxjs';
+import { EMPTY, map, Observable } from 'rxjs';
+import { SessionService } from '@auth/services/session.service';
+import { MANAGER_ONLY_MESSAGE } from '@auth/permissions';
 import { AddPatientDialog } from '@shared/components/dialogs/add-patient.dialog';
 import { BlockDialog, BlockInput } from '@shared/components/dialogs/block.dialog';
 import { ChangeRoleDialog } from '@shared/components/dialogs/change-role.dialog';
@@ -13,6 +15,7 @@ import { ProfessionalSchedulesDialog } from '@shared/components/dialogs/professi
 import { ScheduleDialog } from '@shared/components/dialogs/schedule.dialog';
 import { ServiceDialog, ServiceInput } from '@shared/components/dialogs/service.dialog';
 import { ClinicService, Member, MemberRole } from '../clinic/clinic.models';
+import { FEATURE_MESSAGE, FEATURES, FeatureName } from '../features';
 
 /** Marco de los modales del diseño (radio 14, fondo atenuado). */
 const MODAL: MatDialogConfig = { panelClass: 'vet-dialog', backdropClass: 'vet-backdrop', autoFocus: 'first-tabbable', maxWidth: '94vw' };
@@ -22,8 +25,24 @@ const MODAL: MatDialogConfig = { panelClass: 'vet-dialog', backdropClass: 'vet-b
 export class PanelActionsService {
   private readonly dialog = inject(MatDialog);
   private readonly snack = inject(MatSnackBar);
+  private readonly session = inject(SessionService);
+
+  /** Configurar la clínica es del dueño y los administradores. */
+  private manager(): boolean {
+    if (this.session.isManager()) return true;
+    this.toast(MANAGER_ONLY_MESSAGE);
+    return false;
+  }
+
+  /** Avisa que la función aún no tiene backend. Devuelve `true` si se puede seguir. */
+  private available(feature: FeatureName): boolean {
+    if (FEATURES[feature]) return true;
+    this.toast(FEATURE_MESSAGE[feature]);
+    return false;
+  }
 
   newAppointment(data?: NewAppointmentData): void {
+    if (!this.available('appointments')) return;
     this.dialog
       .open(NewAppointmentDialog, { data, autoFocus: 'first-tabbable' })
       .afterClosed()
@@ -31,10 +50,12 @@ export class PanelActionsService {
   }
 
   addPatient(): void {
+    if (!this.available('patients')) return;
     this.dialog.open(AddPatientDialog, { autoFocus: false });
   }
 
   invite(): void {
+    if (!this.manager()) return;
     this.dialog.open(InviteColleagueDialog, MODAL);
   }
 
@@ -56,18 +77,22 @@ export class PanelActionsService {
   }
 
   editService(service?: ClinicService): Observable<ServiceInput | undefined> {
+    if (!this.manager() || !this.available('catalog')) return EMPTY;
     return this.dialog.open<ServiceDialog, ClinicService | null, ServiceInput>(ServiceDialog, { ...MODAL, data: service ?? null }).afterClosed();
   }
 
   addBlock(): Observable<BlockInput | undefined> {
+    if (!this.manager() || !this.available('schedule')) return EMPTY;
     return this.dialog.open<BlockDialog, void, BlockInput>(BlockDialog, MODAL).afterClosed();
   }
 
   editSchedule(): Observable<boolean | undefined> {
+    if (!this.manager() || !this.available('schedule')) return EMPTY;
     return this.dialog.open<ScheduleDialog, void, boolean>(ScheduleDialog, MODAL).afterClosed();
   }
 
   professionalSchedules(): Observable<boolean | undefined> {
+    if (!this.manager() || !this.available('schedule')) return EMPTY;
     return this.dialog.open<ProfessionalSchedulesDialog, void, boolean>(ProfessionalSchedulesDialog, MODAL).afterClosed();
   }
 

@@ -1,7 +1,10 @@
 import { computed, inject, Injectable } from '@angular/core';
 import { SessionService } from '@auth/services/session.service';
 import { ClinicStore } from '../clinic/clinic.store';
-import { cap, longDate, timeAgo } from '../clinic/date.utils';
+import { FEATURES } from '../features';
+import { cap, dayMonth, longDate, timeAgo } from '../clinic/date.utils';
+
+const PLAN_NAME: Record<string, string> = { PRO_TRIAL: 'PRO (prueba)', PRO: 'PRO', BASIC: 'Básico', FREE: 'Gratis' };
 
 /** Datos de la vista Inicio (saludo, agenda de hoy, pendientes y resumen de la clínica). */
 @Injectable({ providedIn: 'root' })
@@ -27,6 +30,7 @@ export class HomeService {
   /** Frase del saludo según el día (DISENO §8). */
   readonly phrase = computed(() => {
     const n = this.activeToday();
+    if (!FEATURES.appointments) return 'Mientras se conecta la agenda, deja lista tu clínica y arma tu equipo.';
     if (n === 0) return 'Hoy no hay citas. Buen momento para dejar todo en orden.';
     if (n >= 15) return `Hoy tienes ${n} citas. Vamos paso a paso.`;
     return `Hoy tienes ${n} ${n === 1 ? 'cita' : 'citas'}. Vamos paso a paso.`;
@@ -58,17 +62,33 @@ export class HomeService {
     return Math.max(0, Math.round((start - this.store.now()) / 60_000));
   }
 
-  readonly planLabel = 'Plan PRO';
-  readonly renewsOn = computed(() => cap('3 nov'));
-  readonly planProgress = 78;
-  readonly storageUsedGb = 1.2;
-  readonly storageTotalGb = 50;
+  /** Plan de la clínica (`GET /subscription/active`). */
+  readonly subscription = this.store.subscription;
+  readonly planLabel = computed(() => {
+    const sub = this.subscription();
+    return sub ? `Plan ${PLAN_NAME[sub.plan] ?? sub.plan}` : 'Sin plan activo';
+  });
+  /** "Renueva el 3 nov" / "Vence el 29 nov" (la prueba no se renueva). */
+  readonly renewsOn = computed(() => {
+    const sub = this.subscription();
+    if (!sub) return '';
+    const end = dayMonth(new Date(`${sub.endDate}T00:00:00`).getTime());
+    return sub.plan.endsWith('TRIAL') ? `Vence el ${end}` : `Renueva el ${end}`;
+  });
+  /** Cuánto del plan ya pasó, de 0 a 100. */
+  readonly planProgress = computed(() => {
+    const sub = this.subscription();
+    if (!sub) return 0;
+    const start = new Date(`${sub.startDate}T00:00:00`).getTime();
+    const end = new Date(`${sub.endDate}T00:00:00`).getTime();
+    return end > start ? Math.min(100, Math.max(0, Math.round(((this.store.now() - start) / (end - start)) * 100))) : 0;
+  });
 
   notifyVaccines(): void {
     for (const p of this.vaccinesToNotify()) this.store.notifyVaccine(p.id);
   }
 
-  resend(id: string): void {
-    this.store.resendInvitation(id);
+  resend(id: string) {
+    return this.store.resendInvitation(id);
   }
 }

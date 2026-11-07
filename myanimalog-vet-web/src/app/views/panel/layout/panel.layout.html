@@ -6,7 +6,7 @@
     </a>
 
     <nav aria-label="Principal">
-      @for (item of items; track item.path) {
+      @for (item of nav(); track item.path) {
         <a [routerLink]="item.path" routerLinkActive="active" [attr.aria-label]="item.label">
           <vet-icon [name]="item.icon" [size]="18" />
           <span>{{ item.label }}</span>
@@ -29,7 +29,17 @@
     </button>
     <mat-menu #userMenu="matMenu" xPosition="after">
       @if (!verified()) {
-        <div class="menu-note">Tu clínica está {{ session.clinic()?.status === 'UNDER_REVIEW' ? 'en revisión' : 'pendiente' }}.</div>
+        <div class="menu-note">Tu clínica está {{ statusText() }}.</div>
+      }
+      <a mat-menu-item routerLink="/mi-perfil">
+        <mat-icon fontSet="material-icons-outlined">badge</mat-icon>
+        Mi perfil profesional
+      </a>
+      @if (session.clinics().length > 1) {
+        <button mat-menu-item (click)="switchClinic()">
+          <mat-icon fontSet="material-icons-outlined">swap_horiz</mat-icon>
+          Cambiar de clínica
+        </button>
       }
       <button mat-menu-item (click)="signOut()">
         <mat-icon fontSet="material-icons-outlined">logout</mat-icon>
@@ -39,10 +49,27 @@
   </aside>
 
   <main class="main" id="contenido">
-    @if (!verified()) {
-      <div class="banner" role="status">
-        Tu clínica aún no está aprobada. Puedes configurarla, pero no atender pacientes ni recibir citas.
-      </div>
+    @switch (status()) {
+      @case ('SUSPENDED') {
+        <div class="banner banner--bad" role="alert">
+          <div>
+            <strong>Clínica suspendida{{ suspendedSince() ? ' desde el ' + suspendedSince() : '' }}</strong>
+            <span>@if (reason()) { Motivo: {{ reason() }}. }Mientras tanto no puedes agendar, registrar pacientes ni escribir en historias. Tus datos están a salvo.</span>
+          </div>
+          <a class="banner-btn" href="mailto:MyAnimaLog@gmail.com">Contactar soporte</a>
+        </div>
+      }
+      @case ('ACTIVE') {}
+      @case (null) {}
+      @default {
+        <div class="banner" role="status">
+          <div>
+            <strong>Tu clínica está {{ statusText() }}</strong>
+            <span>Mientras tanto puedes configurarla y armar tu equipo; todavía no puedes recibir clientes ni aparecer en el directorio.</span>
+          </div>
+          <a class="banner-btn" routerLink="/registro/estado">Ver estado</a>
+        </div>
+      }
     }
     <router-outlet />
   </main>

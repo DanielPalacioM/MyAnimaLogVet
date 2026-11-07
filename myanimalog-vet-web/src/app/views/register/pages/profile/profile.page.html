@@ -43,6 +43,21 @@
         (picked)="pick('PROFESSIONAL_CARD', $event)"
       />
 
+      @if (needsOwnId) {
+        <div class="reg-grid">
+          <vet-field label="Tipo de documento" for="pf-id-type" [control]="form.controls.idType">
+            <select id="pf-id-type" class="vet-input" formControlName="idType">
+              @for (t of documentTypes; track t.value) {
+                <option [value]="t.value">{{ t.label }}</option>
+              }
+            </select>
+          </vet-field>
+          <vet-field label="Tu número de documento" for="pf-id-number" [control]="form.controls.idNumber">
+            <input id="pf-id-number" class="vet-input" type="text" inputmode="numeric" autocomplete="off" placeholder="Sin puntos ni espacios" formControlName="idNumber" [attr.aria-invalid]="invalid(form.controls.idNumber)" />
+          </vet-field>
+        </div>
+      }
+
       @if (idCovered()) {
         <vet-document-card
           [title]="specs.ID_DOCUMENT.title"

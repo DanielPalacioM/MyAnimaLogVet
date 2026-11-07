@@ -1,5 +1,4 @@
-import { TokenPair } from '@auth/services/token.service';
-import { AccountUser } from '../mock/mock-directory';
+import { AccountUser, ClinicSummary } from '@auth/models/session.models';
 
 export interface LoginCredentials {
   email: string;
@@ -7,6 +6,7 @@ export interface LoginCredentials {
 }
 
 export interface LoginResult {
-  tokens: TokenPair;
   user: AccountUser;
+  /** Clínicas de la persona. Si solo hay una, `user.clinic` ya viene elegida. */
+  clinics: ClinicSummary[];
 }
