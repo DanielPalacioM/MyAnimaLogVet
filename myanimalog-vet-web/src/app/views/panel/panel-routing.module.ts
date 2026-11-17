@@ -16,6 +16,7 @@ const routes: Routes = [
       { path: 'home', redirectTo: 'inicio' },
       { path: 'inicio', title: 'Inicio · MyAnimaLogVet', loadChildren: () => import('../home/home.module').then((m) => m.HomeModule) },
       { path: 'agenda', title: 'Agenda · MyAnimaLogVet', loadChildren: () => import('../agenda/agenda.module').then((m) => m.AgendaModule) },
+      { path: 'pacientes/:petId/historia', title: 'Historia clínica · MyAnimaLogVet', loadChildren: () => import('../history/history.module').then((m) => m.HistoryModule) },
       { path: 'pacientes', title: 'Pacientes · MyAnimaLogVet', loadChildren: () => import('../patients/patients.module').then((m) => m.PatientsModule) },
       { path: 'clientes', title: 'Clientes · MyAnimaLogVet', loadChildren: () => import('../clients/clients.module').then((m) => m.ClientsModule) },
       soon('reportes', 'Reportes'),

@@ -1,11 +1,12 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { SessionService } from '@auth/services/session.service';
 import { ClinicContextService } from '@auth/services/clinic-context.service';
-import { catchError, EMPTY, forkJoin, map, Observable, of, switchMap, tap } from 'rxjs';
+import { catchError, EMPTY, expand, forkJoin, from, map, mergeMap, Observable, of, reduce, switchMap, tap } from 'rxjs';
 import { ApiError } from '../api-error';
 import { ClinicProfileDto, SubscriptionDto } from '../api/api.models';
 import { ClinicApi } from '../api/clinic.api';
-import { hasProfessionalProfile, invitationFrom, memberFrom, profileFrom, roleFromApi, roleToApi } from '../api/mappers';
+import { ClientDto, LinkApi, PageDto, PatientDto } from '../api/link.api';
+import { clientFrom, hasProfessionalProfile, invitationFrom, memberFrom, patientFrom, profileFrom, roleFromApi, roleToApi, withDetail } from '../api/mappers';
 import { TeamApi } from '../api/team.api';
 import {
   Appointment,
@@ -27,6 +28,8 @@ import {
 import { at, sameDay } from './date.utils';
 
 const DAY = 86_400_000;
+/** Tamaño de página al pedir clientes y pacientes (se piden todas las páginas). */
+const PEOPLE_PAGE = 100;
 const COLORS = ['#F5A623', '#BDB8EE', '#9FE3D6', '#FFE2B8', '#FCE3E3', '#D9F5EF'];
 const slug = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '.').replace(/^\.|\.$/g, '');
 const initialsOf = (name: string) => name.split(' ').filter(Boolean).map((p) => p[0]).slice(0, 2).join('').toUpperCase();
@@ -48,6 +51,7 @@ export type LoadState = 'idle' | 'loading' | 'ready' | 'error';
 export class ClinicStore {
   private readonly clinicApi = inject(ClinicApi);
   private readonly teamApi = inject(TeamApi);
+  private readonly linkApi = inject(LinkApi);
   private readonly session = inject(SessionService);
   private readonly context = inject(ClinicContextService);
 
@@ -115,37 +119,25 @@ export class ClinicStore {
   /** Invitaciones que aún se pueden aceptar (vigentes). */
   readonly pendingInvitations = computed(() => this.invitations().filter((i) => !i.expired));
 
-  /** Dueños con al menos una mascota compartida con la clínica. */
+  /** Dueños vinculados a la clínica (`GET /{id}/clients`), tengan o no mascotas compartidas. */
+  readonly clientList = signal<ClientDto[]>([]);
+  /** Estado de la carga de clientes y pacientes (van juntos: los pacientes se asignan a su dueño). */
+  readonly peopleState = signal<LoadState>('idle');
+
+  /** Cada cliente con las mascotas que compartió. La próxima cita sale de la agenda cuando exista. */
   readonly clients = computed<Client[]>(() => {
-    const byOwner = new Map<string, Patient[]>();
-    for (const p of this.patients()) {
-      if (!p.inApp) continue;
-      const list = byOwner.get(p.owner);
-      if (list) list.push(p);
-      else byOwner.set(p.owner, [p]);
-    }
+    const pets = this.patients();
     const now = this.now();
     const appointments = this.appointments();
-    return [...byOwner.entries()].map(([owner, pets]): Client => {
-      const last = pets.reduce((a, b) => (b.lastVisitAt > a.lastVisitAt ? b : a));
-      const ids = new Set(pets.map((p) => p.id));
+    return this.clientList().map((dto): Client => {
+      const mine = pets.filter((p) => p.ownerId === dto.userId);
+      const last = mine.reduce<Patient | null>((a, b) => (!a || b.lastVisitAt > a.lastVisitAt ? b : a), null);
+      const ids = new Set(mine.map((p) => p.id));
       const next =
         appointments
           .filter((a) => ids.has(a.patientId) && a.status !== 'CANCELLED' && a.status !== 'NO_SHOW' && a.start + a.minutes * 60_000 >= now)
           .sort((a, b) => a.start - b.start)[0] ?? null;
-      return {
-        id: slug(owner),
-        name: owner,
-        initials: initialsOf(owner),
-        email: '',
-        phone: pets[0].phone,
-        pets,
-        linkedAt: 0,
-        via: 'QR',
-        lastVisit: last.lastVisit,
-        lastVisitAt: last.lastVisitAt,
-        next,
-      };
+      return { ...clientFrom(dto, mine), lastVisit: last?.lastVisit ?? 'Sin visitas', lastVisitAt: last?.lastVisitAt ?? 0, next };
     });
   });
 
@@ -178,6 +170,77 @@ export class ClinicStore {
     this.loadProfile().subscribe();
     this.loadSubscription().subscribe();
     this.loadTeam().subscribe();
+    this.loadLinkCode().subscribe();
+    this.loadPeople().subscribe();
+  }
+
+  /**
+   * Clientes (dueños vinculados) y pacientes (mascotas compartidas), del backend. Se piden juntos y se cruzan por
+   * `userId`. El servicio puede responder `403/409` si la clínica aún no está aprobada: queda en estado `error`.
+   */
+  loadPeople(): Observable<void> {
+    const id = this.clinicId;
+    if (!id) return EMPTY;
+    this.peopleState.set('loading');
+    return forkJoin({
+      clients: this.fetchAll((page) => this.linkApi.clients(id, page, PEOPLE_PAGE)),
+      patients: this.fetchAll((page) => this.linkApi.patients(id, page, PEOPLE_PAGE)),
+    }).pipe(
+      tap(({ clients, patients }) => {
+        const owners = new Map(clients.map((c) => [c.userId, c.name?.trim() || c.email || 'Sin nombre']));
+        this.clientList.set(clients);
+        // Lo que ya se trajo del detalle (edad, sexo) se conserva al recargar, para que la lista no parpadee.
+        const before = new Map(this.patients().map((p) => [p.id, p]));
+        this.patients.set(
+          patients.map((dto) => {
+            const base = patientFrom(dto, owners.get(dto.ownerUserId) ?? 'Sin nombre');
+            const old = before.get(dto.petId);
+            return old?.birthDate ? { ...base, age: old.age, sex: old.sex, birthDate: old.birthDate } : base;
+          }),
+        );
+        this.peopleState.set('ready');
+        this.enrichPatients(id, patients);
+      }),
+      map(() => undefined),
+      catchError(() => {
+        this.peopleState.set('error');
+        return of(undefined);
+      }),
+    );
+  }
+
+  /**
+   * La lista de pacientes solo trae nombre, especie, raza y foto. Sexo y fecha de nacimiento (la edad) están en el
+   * detalle, así que se piden en segundo plano (de a 5) y la fila se completa sola. Si uno falla, queda con lo básico.
+   */
+  private enrichPatients(veterinaryId: string, list: PatientDto[]): void {
+    from(list)
+      .pipe(mergeMap((p) => this.linkApi.patient(veterinaryId, p.petId).pipe(catchError(() => EMPTY)), 5))
+      .subscribe((detail) => {
+        if (this.clinicId !== veterinaryId) return; // cambió de clínica mientras tanto
+        this.patients.update((all) => all.map((p) => (p.id === detail.petId ? withDetail(p, detail, this.now()) : p)));
+      });
+  }
+
+  /** Junta todas las páginas de un listado paginado del backend. */
+  private fetchAll<T>(fetch: (page: number) => Observable<PageDto<T>>): Observable<T[]> {
+    return fetch(0).pipe(
+      expand((res) => (res.items.length > 0 && (res.page + 1) * res.size < res.total ? fetch(res.page + 1) : EMPTY)),
+      reduce((all, res) => all.concat(res.items), [] as T[]),
+    );
+  }
+
+  /** Código de vinculación vigente (el perfil no siempre lo trae). */
+  loadLinkCode(): Observable<void> {
+    const id = this.clinicId;
+    if (!id) return EMPTY;
+    return this.linkApi.linkCode(id).pipe(
+      tap((res) => {
+        if (res.inviteCode) this.linkCode.set(res.inviteCode);
+      }),
+      map(() => undefined),
+      catchError(() => of(undefined)),
+    );
   }
 
   /** Olvida todo (al cerrar sesión o cambiar de clínica). */
@@ -190,6 +253,8 @@ export class ClinicStore {
     this.invitations.set([]);
     this.teamState.set('idle');
     this.linkCode.set(null);
+    this.clientList.set([]);
+    this.peopleState.set('idle');
     this.patients.set([]);
     this.appointments.set([]);
     this.catalog.set([]);
@@ -429,9 +494,16 @@ export class ClinicStore {
     return patient;
   }
 
-  /** Quita al cliente: la clínica pierde el acceso a todas sus mascotas. */
-  removeClient(owner: string): void {
-    this.patients.update((list) => list.map((p) => (p.owner === owner ? { ...p, inApp: false } : p)));
+  /**
+   * Quita al cliente: el backend revoca todas sus mascotas y borra su correo y teléfono del lado de la clínica
+   * (conserva el nombre). Después se recargan clientes y pacientes. Devuelve cuántas mascotas se revocaron.
+   */
+  removeClient(userId: string): Observable<number> {
+    const id = this.clinicId;
+    if (!id) return EMPTY;
+    return this.linkApi.removeClient(id, userId).pipe(
+      switchMap((res) => this.loadPeople().pipe(map(() => res.revokedPetsCount))),
+    );
   }
 
   notifyVaccine(patientId: string): void {

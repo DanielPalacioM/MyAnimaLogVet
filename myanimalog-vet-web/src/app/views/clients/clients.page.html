@@ -9,7 +9,11 @@
     <button type="button" class="vet-btn vet-btn--primary" (click)="showQr()"><vet-icon name="qr" [size]="16" />Mostrar código QR</button>
   </header>
 
-  <vet-soon-note feature="patients" />
+  @if (store.peopleState() === 'error') {
+    <p class="load-error" role="alert">No pudimos cargar los clientes. <button type="button" (click)="reload()">Reintentar</button></p>
+  } @else if (store.peopleState() === 'ready' && svc.counts().all === 0) {
+    <p class="load-note" role="status">Todavía no hay clientes vinculados. Cuando un dueño escriba tu código o escanee el QR en su app, aparecerá aquí.</p>
+  }
 
   <div class="filters">
     <div class="tabs" role="group" aria-label="Filtro">
@@ -74,10 +78,10 @@
       </div>
       <div class="ss-contact">
         <div>
-          <span><vet-icon name="phone" [size]="14" />{{ c.phone }}</span>
-          <span><vet-icon name="users" [size]="14" />{{ c.email }}</span>
+          @if (c.phone) { <span><vet-icon name="phone" [size]="14" />{{ c.phone }}</span> }
+          @if (c.email) { <span><vet-icon name="users" [size]="14" />{{ c.email }}</span> } @else { <span>Sin correo ni teléfono: el dueño aún no los comparte.</span> }
         </div>
-        <button type="button" class="ss-btn" (click)="call(c.phone)"><vet-icon name="phone" [size]="14" />Llamar</button>
+        @if (c.phone) { <button type="button" class="ss-btn" (click)="call(c.phone)"><vet-icon name="phone" [size]="14" />Llamar</button> }
       </div>
       <div class="ss-hr"></div>
       <h3 class="ss-title">Mascotas compartidas · {{ c.pets.length }}</h3>

@@ -37,6 +37,8 @@ export interface Patient {
   breed: string;
   age: string;
   owner: string;
+  /** `userId` del dueño cuando el paciente viene del backend (para cruzarlo con Clientes). */
+  ownerId?: string;
   phone: string;
   /** Texto de la última visita: "22 sep", "Hoy". */
   lastVisit: string;
@@ -45,6 +47,12 @@ export interface Patient {
   lastVisitAt: number;
   vaccines: VaccineState;
   inApp: boolean;
+  /** Foto de la mascota (la sube el dueño). */
+  photoUrl?: string | null;
+  /** "Macho" / "Hembra". Solo llega en el detalle del paciente. */
+  sex?: string;
+  /** Fecha de nacimiento ISO. Solo llega en el detalle del paciente. */
+  birthDate?: string;
 }
 
 export interface Appointment {

@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
+import { errorMessage } from '@services/api-error';
 import { Client } from '@services/clinic/clinic.models';
 import { ClinicStore } from '@services/clinic/clinic.store';
 import { fullDate, longDay, sameDay, dayMonth, hourParts } from '@services/clinic/date.utils';
@@ -37,6 +38,12 @@ export class ClientsPage implements OnInit {
   ngOnInit(): void {
     this.svc.reset();
     this.svc.selectedId.set(null);
+    this.reload();
+  }
+
+  /** Vuelve a pedir clientes y pacientes: otro dueño pudo vincularse o retirar mascotas desde su app. */
+  protected reload(): void {
+    this.store.loadPeople().subscribe();
   }
 
   protected count(f: ClientFilter): number {
@@ -113,9 +120,13 @@ export class ClientsPage implements OnInit {
       })
       .subscribe((ok) => {
         if (!ok) return;
-        this.store.removeClient(c.name);
-        this.svc.selectedId.set(null);
-        this.actions.toast(`${c.name} ya no está vinculado`);
+        this.store.removeClient(c.id).subscribe({
+          next: () => {
+            this.svc.selectedId.set(null);
+            this.actions.toast(`${c.name} ya no está vinculado`);
+          },
+          error: (e: unknown) => this.actions.toast(errorMessage(e, 'No pudimos quitar al cliente. Inténtalo de nuevo.')),
+        });
       });
   }
 }

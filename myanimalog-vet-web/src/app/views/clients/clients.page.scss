@@ -2,6 +2,9 @@
 
 .head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; min-height: 44px; }
 h1 { margin: 0; color: #1a1a2e; font: 700 30px/1.25 'Afacad', sans-serif; }
+.load-error, .load-note { margin: 0; padding: 10px 14px; border-radius: 8px; font: 500 13px/1.4 'Afacad', sans-serif; }
+.load-error { background: #fff1ef; color: #b3261e; button { margin-left: 8px; border: 0; background: none; color: #4037be; font: inherit; font-weight: 700; cursor: pointer; text-decoration: underline; } }
+.load-note { background: #f7f6ff; color: #4a4860; }
 .total { margin-right: auto; color: #8a8a9a; font: 500 15px/1.25 'Afacad', sans-serif; }
 .search { position: relative; width: min(340px, 100%); }
 .search vet-icon { position: absolute; left: 14px; top: 50%; color: #1a1a2e; transform: translateY(-50%); }

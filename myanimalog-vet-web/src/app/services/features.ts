@@ -9,7 +9,7 @@ export const FEATURES = environment.features;
 export type FeatureName = keyof typeof FEATURES;
 
 export const FEATURE_MESSAGE: Record<FeatureName, string> = {
-  patients: 'Los pacientes se conectan con el servicio de mascotas: estará disponible pronto.',
+  patients: 'La lista muestra las mascotas que los dueños comparten desde su app. Registrar pacientes sin app y enviar invitaciones para reclamar estará disponible pronto.',
   appointments: 'La agenda se conecta con el servicio de citas: estará disponible pronto.',
   catalog: 'El catálogo de servicios estará disponible pronto.',
   schedule: 'Los horarios y bloqueos estarán disponibles pronto.',

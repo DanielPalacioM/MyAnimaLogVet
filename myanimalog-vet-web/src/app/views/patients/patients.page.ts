@@ -43,6 +43,8 @@ export class PatientsPage implements OnInit {
     const q = this.route.snapshot.queryParamMap.get('q');
     this.svc.query.set(q ?? '');
     this.svc.page.set(1);
+    // Las mascotas las comparten los dueños desde su app: se vuelve a pedir la lista al entrar.
+    this.store.loadPeople().subscribe();
   }
 
   protected count(tab: SpeciesTab): number {
@@ -98,8 +100,9 @@ export class PatientsPage implements OnInit {
     return this.store.professional(a.professionalId)?.name ?? '';
   }
 
-  protected registerVisit(name: string): void {
-    this.actions.toast(`Visita de ${name} registrada`);
+  /** Abre la historia clínica del paciente (Medical, con el token de clínica): ahí se registra la visita. */
+  protected openHistory(petId: string): void {
+    void this.router.navigate(['/pacientes', petId, 'historia']);
   }
 
   protected uploadDoc(): void {

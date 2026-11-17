@@ -9,6 +9,11 @@
   </header>
 
   <vet-soon-note feature="patients" />
+  @if (store.peopleState() === 'error') {
+    <p role="alert" style="margin:0;padding:10px 14px;border-radius:8px;background:#fff1ef;color:#b3261e;font:500 13px/1.4 'Afacad',sans-serif">
+      No pudimos cargar los pacientes. <button type="button" style="border:0;background:none;color:#4037be;font:inherit;font-weight:700;cursor:pointer;text-decoration:underline" (click)="store.loadPeople().subscribe()">Reintentar</button>
+    </p>
+  }
 
   <div class="filters">
     <div class="tabs" role="group" aria-label="Especie">
@@ -74,10 +79,16 @@
     @let next = svc.nextAppointmentsOf(p.id)[0];
     <vet-side-sheet label="Ficha del paciente" (closed)="svc.selectedId.set(null)">
       <div class="ss-hero">
-        <span class="ss-hero-av"><vet-icon name="paw" [size]="26" /></span>
+        <span class="ss-hero-av">
+          @if (p.photoUrl) {
+            <img [src]="p.photoUrl" [alt]="'Foto de ' + p.name" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover" />
+          } @else {
+            <vet-icon name="paw" [size]="26" />
+          }
+        </span>
         <div>
           <h2>{{ p.name }}</h2>
-          <p>{{ p.species }} · {{ p.breed }} · {{ p.age }}</p>
+          <p>{{ p.species }}@if (p.sex) { · {{ p.sex }} }@if (p.breed) { · {{ p.breed }} } · {{ p.age }}</p>
         </div>
       </div>
       <div class="ss-chips">
@@ -104,9 +115,15 @@
         <div>
           <small>DUEÑO</small>
           <strong>{{ p.owner }}</strong>
-          <span class="ss-phone"><vet-icon name="phone" [size]="13" />{{ p.phone }}</span>
+          @if (p.phone) {
+            <span class="ss-phone"><vet-icon name="phone" [size]="13" />{{ p.phone }}</span>
+          } @else {
+            <small>El dueño aún no comparte su teléfono con la clínica.</small>
+          }
         </div>
-        <a class="ss-btn" [href]="'tel:' + p.phone.replaceAll(' ', '')"><vet-icon name="phone" [size]="14" />Llamar</a>
+        @if (p.phone) {
+          <a class="ss-btn" [href]="'tel:' + p.phone.replaceAll(' ', '')"><vet-icon name="phone" [size]="14" />Llamar</a>
+        }
       </div>
       @if (p.inApp) {
         <p class="ss-share" style="margin: 0"><vet-icon name="shield" [size]="14" />Comparte la historia de {{ p.name }} con la clínica</p>
@@ -114,7 +131,7 @@
         <button type="button" class="ss-link" (click)="claimLink(p.owner)">Enviar enlace para reclamar</button>
       }
       <ng-container footer>
-        <button type="button" class="ss-primary" (click)="registerVisit(p.name)"><vet-icon name="plus" [size]="16" />Registrar visita</button>
+        <button type="button" class="ss-primary" (click)="openHistory(p.id)"><vet-icon name="plus" [size]="16" />Registrar visita</button>
         <div class="ss-two">
           <button type="button" (click)="newAppointment(p.id)">Nueva cita</button>
           <button type="button" (click)="uploadDoc()">Subir documento</button>

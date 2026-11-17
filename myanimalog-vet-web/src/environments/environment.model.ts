@@ -15,6 +15,8 @@ export interface Environment {
    * tiene que estar en sus "Orígenes autorizados" en Google Cloud.
    */
   googleClientId: string;
+  /** Dirección pública de la app del dueño (MyAnimaLog). Va en el enlace que la clínica le manda al dueño para vincularse. */
+  ownerAppUrl: string;
   /** Versiones de los textos legales que se aceptan al registrar. Deben coincidir con las del servidor. */
   legal: { dataPolicyVersion: string; termsVersion: string };
   features: {

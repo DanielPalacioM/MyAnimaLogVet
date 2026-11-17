@@ -1,0 +1,241 @@
+<nav class="crumbs" aria-label="Ruta">
+  <a routerLink="/pacientes">Pacientes</a>
+  <span aria-hidden="true">/</span>
+  <span>Historia clínica</span>
+</nav>
+
+<header class="head">
+  <div>
+    <h1>Historia clínica</h1>
+    <p class="sub">Historia compartida por el dueño · {{ petId | slice: 0 : 8 }}…</p>
+  </div>
+  <div class="actions">
+    @if (canWriteClinical()) {
+      <button type="button" class="vet-btn vet-btn--primary" (click)="add('visit')"><vet-icon name="plus" [size]="16" />Registrar visita</button>
+    }
+    @if (canNursing()) {
+      <button type="button" class="vet-btn vet-btn--secondary" (click)="add('vaccine')">Aplicar vacuna</button>
+      <button type="button" class="vet-btn vet-btn--secondary" (click)="add('weight')">Registrar peso</button>
+    }
+  </div>
+</header>
+
+@if (summary().data; as s) {
+  <div class="chips" aria-label="Datos clave">
+    @for (a of s.allergies; track a) {
+      <span class="chip chip--warn">Alergia: {{ a }}</span>
+    }
+    @if (lastWeight(); as w) {
+      <span class="chip">Último peso {{ w }}</span>
+    }
+    @if (s.vaccines; as v) {
+      <span class="chip chip--ok">{{ v.valid }} vigentes</span>
+      @if (v.dueSoon) { <span class="chip chip--warn">{{ v.dueSoon }} por vencer</span> }
+      @if (v.overdue) { <span class="chip chip--bad">{{ v.overdue }} vencidas</span> }
+    }
+  </div>
+}
+
+<div class="tabs" role="tablist" aria-label="Secciones de la historia">
+  @for (t of tabs(); track t.value) {
+    <button type="button" role="tab" [class.on]="tab() === t.value" [attr.aria-selected]="tab() === t.value" (click)="select(t.value)">
+      {{ t.label }}@if (t.count !== null) { <small>{{ t.count }}</small> }
+    </button>
+  }
+</div>
+
+@if (basicOnly()) {
+  <p class="note">Con tu rol ves el resumen básico. Consultas, diagnósticos, laboratorios, cirugías y documentos son del equipo clínico.</p>
+}
+
+<section class="panel" role="tabpanel">
+  @switch (tab()) {
+    @case ('summary') {
+      @if (summary().loading) {
+        <p class="state" role="status">Cargando el resumen…</p>
+      } @else if (summary().error; as e) {
+        <div class="state"><p role="alert">{{ e }}</p><button type="button" class="vet-btn vet-btn--secondary" (click)="reload()">Reintentar</button></div>
+      } @else {
+        @if (summary().data; as s) {
+          <div class="grid">
+            <article class="card">
+              <h2>Alertas</h2>
+              @for (a of s.allergies; track a) { <p class="row">Alergia a {{ a }}</p> } @empty { <p class="muted">Sin alergias registradas.</p> }
+            </article>
+            <article class="card">
+              <h2>Tratamientos activos</h2>
+              @for (t of s.activeTreatments; track t) { <p class="row">{{ t }}</p> } @empty { <p class="muted">No hay tratamientos activos.</p> }
+            </article>
+          </div>
+        }
+        @if (!basicOnly()) {
+          <h2 class="title">Línea de tiempo</h2>
+          @for (e of timeline(); track $index) {
+            <div class="item">
+              <span class="date">{{ day(e.date) }}</span>
+              <div><strong>{{ e.title }}</strong><small>{{ e.kind }}@if (e.detail) { · {{ e.detail }} }</small></div>
+            </div>
+          } @empty {
+            <p class="muted">Todavía no hay registros. Cuando el dueño comparta la historia o la clínica registre algo, aparecerá aquí.</p>
+          }
+        }
+      }
+    }
+
+    @case ('visits') {
+      @if (visits().loading) { <p class="state" role="status">Cargando consultas…</p> }
+      @else if (visits().error; as e) { <p class="state" role="alert">{{ e }}</p> }
+      @else {
+        @for (v of sortedVisits(); track v.id) {
+          <article class="card">
+            <div class="top"><h2>{{ v.reason || 'Consulta' }}</h2><span class="muted">{{ day(v.date) }}</span></div>
+            <p class="muted">{{ v.veterinarian }}@if (v.veterinaryName) { · {{ v.veterinaryName }} }</p>
+            <div class="vitals">
+              @if (v.weight !== null) { <span>Peso <b>{{ v.weight }} kg</b></span> }
+              @if (v.temperature !== null) { <span>Temp. <b>{{ v.temperature }} °C</b></span> }
+              @if (v.heartRate !== null) { <span>F. cardíaca <b>{{ v.heartRate }}</b></span> }
+              @if (v.respiratoryRate !== null) { <span>F. resp. <b>{{ v.respiratoryRate }}</b></span> }
+              @if (v.mucousMembranes) { <span>Mucosas <b>{{ v.mucousMembranes }}</b></span> }
+              @if (v.bodyConditionScore !== null) { <span>Condición <b>{{ v.bodyConditionScore }}/9</b></span> }
+            </div>
+            @if (v.anamnesis) { <p><b>Anamnesis.</b> {{ v.anamnesis }}</p> }
+            @if (v.physicalExam) { <p><b>Examen físico.</b> {{ v.physicalExam }}</p> }
+            @if (v.diagnosis) { <p><b>Diagnóstico.</b> {{ v.diagnosis }}</p> }
+            @if (v.plan) { <p><b>Plan.</b> {{ v.plan }}</p> }
+            @if (v.notes) { <p class="muted">{{ v.notes }}</p> }
+          </article>
+        } @empty { <p class="state">Todavía no hay consultas.</p> }
+      }
+    }
+
+    @case ('vaccines') {
+      @if (vaccines().loading) { <p class="state" role="status">Cargando el carnet…</p> }
+      @else if (vaccines().error; as e) { <p class="state" role="alert">{{ e }}</p> }
+      @else {
+        @for (v of sortedVaccines(); track v.id) {
+          <article class="card">
+            <div class="top"><h2>{{ v.name }}</h2><span class="chip" [ngClass]="'chip--' + vaccineState(v).tone">{{ vaccineState(v).label }}</span></div>
+            <dl>
+              <dt>Aplicada</dt><dd>{{ day(v.applicationDate) }}</dd>
+              @if (v.nextDoseDate) { <dt>Próxima dosis</dt><dd>{{ day(v.nextDoseDate) }}</dd> }
+              @if (v.lotNumber) { <dt>Lote</dt><dd>{{ v.lotNumber }}</dd> }
+              @if (v.manufacturer) { <dt>Laboratorio</dt><dd>{{ v.manufacturer }}</dd> }
+              @if (v.veterinarian) { <dt>Aplicó</dt><dd>{{ v.veterinarian }}</dd> }
+            </dl>
+            @if (v.notes) { <p class="muted">{{ v.notes }}</p> }
+          </article>
+        } @empty { <p class="state">Todavía no hay vacunas en el carnet.</p> }
+      }
+    }
+
+    @case ('weight') {
+      @if (weights().loading) { <p class="state" role="status">Cargando el peso…</p> }
+      @else if (weights().error; as e) { <p class="state" role="alert">{{ e }}</p> }
+      @else {
+        @for (w of weightRows(); track w.id) {
+          <div class="item" [class.owner]="w.source === 'OWNER'">
+            <span class="date">{{ day(w.date) }}</span>
+            <div>
+              <strong>{{ w.weight }} {{ w.unit }}@if (w.diff !== null) { <em [class.up]="w.diff > 0" [class.down]="w.diff < 0"> {{ signed(w.diff) }}</em> }</strong>
+              <small>{{ w.source === 'OWNER' ? 'Dueño · desde la app' : 'Clínica' }}@if (w.note) { · {{ w.note }} }</small>
+            </div>
+          </div>
+        } @empty { <p class="state">Todavía no hay registros de peso.</p> }
+      }
+    }
+
+    @case ('treatments') {
+      @if (canWriteClinical() && hasVisits()) {
+        <div class="bar"><button type="button" class="vet-btn vet-btn--primary" (click)="add('treatment')">Nuevo tratamiento</button></div>
+      }
+      @if (visits().loading || treatments().loading) { <p class="state" role="status">Cargando tratamientos…</p> }
+      @else if (treatments().error; as e) { <p class="state" role="alert">{{ e }}</p> }
+      @else {
+        @for (t of treatments().data; track t.id) {
+          <article class="card">
+            <div class="top">
+              <h2>{{ t.description || 'Tratamiento' }}</h2>
+              @if (t.status) { <span class="chip" [ngClass]="'chip--' + treatmentTone(t.status)">{{ t.status }}</span> }
+            </div>
+            <p class="muted">{{ day(t.startDate) }}@if (t.endDate) { → {{ day(t.endDate) }} }@if (t.protocol) { · {{ t.protocol }} }</p>
+            @for (m of t.medications; track $index) {
+              <p class="row">{{ m.name }} · {{ m.dosage }} · {{ m.frequency }} · {{ m.duration }}@if (m.status) { <em> · {{ m.status }}</em> }@if (m.reactionNote) { <em> · {{ m.reactionNote }}</em> }</p>
+            }
+            @if (t.instructions) { <p><b>Indicaciones.</b> {{ t.instructions }}</p> }
+            @if (t.notes) { <p class="muted">{{ t.notes }}</p> }
+            @if (canWriteClinical()) {
+              <div class="bar"><button type="button" class="vet-btn vet-btn--secondary" (click)="add('medication', t.id)">Agregar medicamento</button></div>
+            }
+          </article>
+        } @empty { <p class="state">No hay tratamientos registrados en las consultas.</p> }
+      }
+    }
+
+    @case ('surgeries') {
+      @if (canWriteClinical() && hasVisits()) {
+        <div class="bar"><button type="button" class="vet-btn vet-btn--primary" (click)="add('surgery')">Programar cirugía</button></div>
+      }
+      @if (surgeries().loading) { <p class="state" role="status">Cargando cirugías…</p> }
+      @else if (surgeries().error; as e) { <p class="state" role="alert">{{ e }}</p> }
+      @else {
+        @for (s of sortedSurgeries(); track s.id) {
+          <article class="card">
+            <div class="top"><h2>{{ s.title }}</h2><span class="muted">{{ day(s.surgeryDate) }}</span></div>
+            <dl>
+              @if (s.status) { <dt>Estado</dt><dd>{{ s.status }}</dd> }
+              @if (s.outcome) { <dt>Resultado</dt><dd>{{ s.outcome }}</dd> }
+              @if (s.durationMinutes !== null) { <dt>Duración</dt><dd>{{ s.durationMinutes }} min</dd> }
+              @if (s.asaRisk !== null) { <dt>Riesgo ASA</dt><dd>{{ s.asaRisk }}</dd> }
+              @if (s.veterinarian) { <dt>Cirujano</dt><dd>{{ s.veterinarian }}</dd> }
+              @if (s.anesthesiaUsed) { <dt>Anestesia</dt><dd>{{ s.anesthesiaUsed }}</dd> }
+            </dl>
+            @if (s.description) { <p>{{ s.description }}</p> }
+            @if (s.postOpInstructions) { <p class="muted"><b>Posoperatorio.</b> {{ s.postOpInstructions }}</p> }
+            @if (canWriteClinical()) {
+              <div class="bar"><button type="button" class="vet-btn vet-btn--secondary" (click)="add('surgeryStatus', s.id)">Cambiar estado</button></div>
+            }
+          </article>
+        } @empty { <p class="state">Todavía no hay cirugías.</p> }
+      }
+    }
+
+    @case ('labs') {
+      @if (canWriteClinical() && hasVisits()) {
+        <div class="bar"><button type="button" class="vet-btn vet-btn--primary" (click)="add('lab')">Agregar examen</button></div>
+      }
+      @if (visits().loading || labs().loading) { <p class="state" role="status">Cargando laboratorio…</p> }
+      @else if (labs().error; as e) { <p class="state" role="alert">{{ e }}</p> }
+      @else {
+        @for (l of labs().data; track l.id) {
+          <article class="card">
+            <div class="top">
+              <h2>{{ l.name }}</h2>
+              @if (l.status) { <span class="chip" [ngClass]="l.status === 'NORMAL' ? 'chip--ok' : 'chip--bad'">{{ l.status === 'NORMAL' ? 'Normal' : 'Fuera de rango' }}</span> }
+              @else if (l.isNormal !== null) { <span class="chip" [ngClass]="l.isNormal ? 'chip--ok' : 'chip--bad'">{{ l.isNormal ? 'Normal' : 'Fuera de rango' }}</span> }
+            </div>
+            <p class="muted">{{ day(l.date) }}@if (l.laboratoryName) { · {{ l.laboratoryName }} }@if (l.veterinarian) { · {{ l.veterinarian }} }</p>
+            @if (l.results.length) {
+              <table>
+                <thead><tr><th>Parámetro</th><th>Resultado</th><th>Rango normal</th><th></th></tr></thead>
+                <tbody>
+                  @for (p of l.results; track $index) {
+                    <tr [class.out]="p.flag && p.flag !== 'NORMAL'">
+                      <td>{{ p.parameter }}</td><td>{{ p.result }} {{ p.unit }}</td><td>{{ p.reference }}</td><td>{{ p.flag }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            } @else {
+              <dl>
+                <dt>Resultado</dt><dd>{{ l.result }}</dd>
+                @if (l.normalRange) { <dt>Rango normal</dt><dd>{{ l.normalRange }}</dd> }
+              </dl>
+            }
+            @if (l.interpretation) { <p><b>Interpretación.</b> {{ l.interpretation }}</p> }
+            @if (l.notes) { <p class="muted">{{ l.notes }}</p> }
+          </article>
+        } @empty { <p class="state">No hay laboratorios registrados en las consultas.</p> }
+      }
+    }
+  }
+</section>
