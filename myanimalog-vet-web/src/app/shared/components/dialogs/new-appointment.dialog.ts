@@ -1,8 +1,11 @@
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { startWith } from 'rxjs';
+import { errorMessage } from '@services/api-error';
+import { FEATURES } from '@services/features';
+import { Appointment } from '@services/clinic/clinic.models';
 import { ClinicStore } from '@services/clinic/clinic.store';
 import { at, isoDate, startOfDay } from '@services/clinic/date.utils';
 import { VetField } from '../form-field/form-field.component';
@@ -11,16 +14,22 @@ export interface NewAppointmentData {
   patientId?: string;
   /** Día inicial (ms). */
   day?: number;
+  /** Si viene, el diálogo reprograma esa cita (solo cambia fecha y hora). */
+  reschedule?: Appointment;
 }
 
 const SLOTS = Array.from({ length: 18 }, (_, i) => `${String(8 + Math.floor(i / 2)).padStart(2, '0')}:${i % 2 ? '30' : '00'}`);
 
-/** Diálogo "Nueva cita": paciente → servicio → profesional → fecha y hora libre (DISENO §10). */
+/** Diálogo "Nueva cita": paciente → servicio → profesional → fecha y hora libre (DISENO §10). También reprograma. */
 @Component({
   selector: 'vet-new-appointment-dialog',
   imports: [ReactiveFormsModule, MatDialogModule, VetField],
   template: `
-    <h2 mat-dialog-title>Nueva cita</h2>
+    <h2 mat-dialog-title>{{ reschedule ? 'Reprogramar cita' : 'Nueva cita' }}</h2>
+    @if (blocker(); as why) {
+      <mat-dialog-content class="content"><p class="reg-alert reg-alert--error" role="alert">{{ why }}</p></mat-dialog-content>
+      <mat-dialog-actions align="end"><button type="button" class="vet-btn vet-btn--secondary" mat-dialog-close>Cerrar</button></mat-dialog-actions>
+    } @else {
     <form [formGroup]="form" (ngSubmit)="save()" novalidate>
       <mat-dialog-content class="content">
         <vet-field label="Paciente" for="na-patient" [control]="form.controls.patient" [messages]="{ unknown: 'Elige un paciente de la lista.' }">
@@ -62,15 +71,22 @@ const SLOTS = Array.from({ length: 18 }, (_, i) => `${String(8 + Math.floor(i / 
           </vet-field>
         </div>
 
-        @if (error) {
-          <p class="reg-alert reg-alert--error" role="alert">{{ error }}</p>
+        @if (!reschedule) {
+          <vet-field label="Nota (opcional)" for="na-note" [control]="form.controls.note">
+            <input id="na-note" class="vet-input" formControlName="note" maxlength="300" placeholder="Ej. Trae el carné de vacunas" autocomplete="off" />
+          </vet-field>
+        }
+
+        @if (error()) {
+          <p class="reg-alert reg-alert--error" role="alert">{{ error() }}</p>
         }
       </mat-dialog-content>
       <mat-dialog-actions align="end">
         <button type="button" class="vet-btn vet-btn--secondary" mat-dialog-close>Cancelar</button>
-        <button type="submit" class="vet-btn vet-btn--primary">Agendar cita</button>
+        <button type="submit" class="vet-btn vet-btn--primary" [disabled]="saving()">{{ reschedule ? 'Reprogramar' : 'Agendar cita' }}</button>
       </mat-dialog-actions>
     </form>
+    }
   `,
   styles: `
     .content { display: flex; flex-direction: column; gap: 12px; min-width: min(440px, 80vw); padding: 8px 24px 12px !important; }
@@ -84,52 +100,83 @@ export class NewAppointmentDialog {
   private readonly ref = inject<MatDialogRef<NewAppointmentDialog, boolean>>(MatDialogRef);
   private readonly data = inject<NewAppointmentData | null>(MAT_DIALOG_DATA, { optional: true });
 
+  protected readonly reschedule = this.data?.reschedule ?? null;
   protected readonly today = isoDate(Date.now());
-  protected error = '';
+  protected readonly error = signal('');
+  protected readonly saving = signal(false);
 
-  private readonly initial = this.data?.patientId ? this.store.patient(this.data.patientId) : undefined;
+  /** Sin servicios o sin pacientes no hay nada que agendar: se explica en vez de abrir un formulario roto. */
+  protected readonly blocker = computed(() => {
+    if (!FEATURES.catalog) return 'El catálogo de servicios todavía no está disponible en el backend, así que por ahora las citas se agendan desde la app del dueño y aquí se gestionan.';
+    if (!this.store.services.length) return 'Primero crea al menos un servicio activo en “Servicios y horarios”.';
+    if (!this.store.patients().length && !this.reschedule) return 'Todavía no hay pacientes: aparecen cuando un dueño comparte su mascota con la clínica.';
+    if (!this.store.professionals.length) return 'No hay profesionales activos en el equipo.';
+    return '';
+  });
+
+  private readonly initial = this.store.patient(this.reschedule?.patientId ?? this.data?.patientId ?? '');
+  private readonly firstService = this.store.services.find((s) => s.id === this.reschedule?.serviceId) ?? this.store.services[0];
   protected readonly form = inject(FormBuilder).nonNullable.group({
-    patient: [this.initial ? `${this.initial.name} · ${this.initial.owner}` : '', [Validators.required]],
-    service: [this.store.services[0].id, [Validators.required]],
-    professional: [this.store.services[0].professionalIds[0], [Validators.required]],
-    date: [isoDate(this.data?.day ?? Date.now()), [Validators.required]],
+    patient: [this.initial ? `${this.initial.name} · ${this.initial.owner}` : (this.reschedule?.patientName ?? ''), [Validators.required]],
+    service: [this.firstService?.id ?? '', [Validators.required]],
+    professional: [this.reschedule?.professionalId ?? this.pros(this.firstService?.id)[0]?.id ?? '', [Validators.required]],
+    date: [isoDate(this.reschedule?.start ?? this.data?.day ?? Date.now()), [Validators.required]],
     time: ['', [Validators.required]],
+    note: [''],
   });
 
   private readonly values = toSignal(this.form.valueChanges.pipe(startWith(this.form.getRawValue())), { initialValue: this.form.getRawValue() });
   private readonly service = computed(() => this.store.services.find((s) => s.id === this.values().service) ?? this.store.services[0]);
   protected readonly patientOptions = computed(() => this.store.patients().slice(0, 400));
-  protected readonly professionals = computed(() => this.store.professionals.filter((p) => this.service().professionalIds.includes(p.id)));
+  protected readonly professionals = computed(() => this.pros(this.service()?.id));
 
   protected readonly slots = computed(() => {
     const v = this.values();
     const day = startOfDay(new Date(`${v.date}T00:00:00`).getTime());
-    const minutes = this.service().minutes;
+    const minutes = this.service()?.minutes ?? 30;
     const now = this.store.now();
     return SLOTS.map((value) => {
       const start = at(day, value);
       const [h, m] = value.split(':').map(Number);
-      const busy = start < now || !!this.store.unavailableReason(start, minutes, v.professional) || this.store.hasConflict(v.professional ?? "", start, minutes);
+      const busy =
+        start < now ||
+        !!this.store.unavailableReason(start, minutes, v.professional) ||
+        this.store.hasConflict(v.professional ?? '', start, minutes, this.reschedule?.id);
       return { value, busy, label: `${h % 12 === 0 ? 12 : h % 12}:${String(m).padStart(2, '0')} ${h < 12 ? 'a. m.' : 'p. m.'}` };
     });
   });
 
   constructor() {
+    if (this.reschedule) {
+      // Reprogramar solo cambia el momento: lo demás queda como estaba.
+      this.form.controls.patient.disable();
+      this.form.controls.service.disable();
+      this.form.controls.professional.disable();
+    }
     // Si el servicio cambia y el profesional ya no lo presta, se elige otro.
     this.form.controls.service.valueChanges.subscribe(() => {
       const list = this.professionals();
-      if (!list.some((p) => p.id === this.form.controls.professional.value)) this.form.controls.professional.setValue(list[0].id);
+      if (!list.some((p) => p.id === this.form.controls.professional.value)) this.form.controls.professional.setValue(list[0]?.id ?? '');
       this.form.controls.time.setValue('');
     });
     this.form.controls.professional.valueChanges.subscribe(() => this.form.controls.time.setValue(''));
     this.form.controls.date.valueChanges.subscribe(() => this.form.controls.time.setValue(''));
   }
 
+  /** Quienes prestan el servicio. Si el catálogo no dice quién lo presta, pueden todos los que atienden. */
+  private pros(serviceId: string | undefined) {
+    const service = this.store.services.find((s) => s.id === serviceId);
+    const all = this.store.professionals;
+    return service?.professionalIds.length ? all.filter((p) => service.professionalIds.includes(p.id)) : all;
+  }
+
   protected save(): void {
-    this.error = '';
+    this.error.set('');
     this.form.markAllAsTouched();
     const v = this.form.getRawValue();
-    const patient = this.store.patients().find((p) => `${p.name} · ${p.owner}` === v.patient);
+    const patient = this.reschedule
+      ? { id: this.reschedule.patientId }
+      : this.store.patients().find((p) => `${p.name} · ${p.owner}` === v.patient);
     if (!patient) {
       this.form.controls.patient.setErrors({ unknown: true });
       return;
@@ -137,11 +184,30 @@ export class NewAppointmentDialog {
     if (this.form.invalid) return;
     const service = this.service();
     const start = at(startOfDay(new Date(`${v.date}T00:00:00`).getTime()), v.time);
-    if (this.store.hasConflict(v.professional, start, service.minutes)) {
-      this.error = 'Ese horario ya no está libre. Elige otro.';
+    if (this.store.hasConflict(v.professional, start, service.minutes, this.reschedule?.id)) {
+      this.error.set('Ese horario ya no está libre. Elige otro.');
       return;
     }
-    this.store.addAppointment({ patientId: patient.id, service: service.name, professionalId: v.professional, start, minutes: service.minutes });
-    this.ref.close(true);
+    this.saving.set(true);
+    const request = this.reschedule
+      ? this.store.reschedule(this.reschedule.id, start)
+      : this.store.addAppointment({
+          patientId: patient.id,
+          service: service.name,
+          serviceId: service.id,
+          professionalId: v.professional,
+          start,
+          minutes: service.minutes,
+          note: v.note.trim() || undefined,
+        });
+    request.subscribe({
+      next: () => this.ref.close(true),
+      error: (e: unknown) => {
+        this.saving.set(false);
+        this.error.set(errorMessage(e));
+      },
+      // `addAppointment` emite una vez y completa; si no hubiera clínica (EMPTY) no se queda cargando.
+      complete: () => this.saving.set(false),
+    });
   }
 }

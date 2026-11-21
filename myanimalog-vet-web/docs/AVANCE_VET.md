@@ -23,10 +23,10 @@ La colección nueva de Medical trae **los mismos 83 endpoints** que la anterior 
 | Historia clínica · Documentos | ⛔ | `GET /documents?petId=` da 404 en el gateway; la ruta de documentos de la veterinaria no está publicada |
 | Historia clínica · Peso con gráfica (clínica vs dueño) | 🟡 | Hay lista con cambio; falta la gráfica |
 | Inicio (saludo, plan, pendientes) | 🟡 | Saludo, plan e invitaciones del equipo sí; **citas de hoy, solicitudes y vacunas vencidas** no |
-| Agenda (día por profesional, detalle de la cita) | ⛔ | Sin estado de cita, servicio ni duración (§2). Faltan en Figma: vista semana, modal de nueva cita y estados especiales |
+| Agenda (día por profesional, semana, detalle de la cita, nueva cita, solicitudes, reprogramar) | 🟡 | Conectada al calendar-service (colección "Calendar Microservice"): estados, servicio y duración vienen de la cita. Calendar es un servicio aparte en Cloud Run (las rutas existen, piden token); **falta CORS para el panel desplegado** y el endpoint de disponibilidad. Ver `ADAPTACION_ENDPOINTS_VET.md` §6 |
 | Pacientes (lista, ficha, agregar paciente, por reclamar, acceso revocado) | ⛔ | No hay lista de mascotas compartidas con la clínica |
 | Clientes (lista, ficha, quitar cliente) | ⛔ | No hay lista de dueños vinculados. "Mostrar código QR" sí funciona |
-| Servicios y horarios (catálogo, horario, bloqueos) | ⛔ | Sin endpoints de servicios ni de bloqueos |
+| Servicios y horarios (catálogo, horario, bloqueos) | 🟡 | Catálogo, horario de atención y bloqueos conectados (sin probar con token). Falta el horario por profesional |
 | Reportes | ⬜ | Solo "Pronto"; depende de citas, pacientes y servicios |
 
 ## 2. Qué bloquea y quién lo desbloquea

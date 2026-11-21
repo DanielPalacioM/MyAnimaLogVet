@@ -6,6 +6,8 @@ export interface Environment {
   userApiUrl: string;
   /** Base del veterinary-service (o del gateway). Sin barra final y sin `/api/veterinary`. */
   vetApiUrl: string;
+  /** Base del calendar-service (citas), con `/api` y sin barra final. En local puede ser el mismo gateway. */
+  calendarApiUrl: string;
   /**
    * Funciones que ya tienen backend. Las que están en `false` muestran su pantalla vacía
    * y avisan "disponible pronto" en vez de guardar datos de mentira.
@@ -24,5 +26,6 @@ export interface Environment {
     appointments: boolean;
     catalog: boolean;
     schedule: boolean;
+    professionalSchedule: boolean;
   };
 }

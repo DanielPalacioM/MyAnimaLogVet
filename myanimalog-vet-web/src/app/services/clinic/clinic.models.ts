@@ -53,6 +53,8 @@ export interface Patient {
   sex?: string;
   /** Fecha de nacimiento ISO. Solo llega en el detalle del paciente. */
   birthDate?: string;
+  /** Peso del perfil de la mascota (kg), si el detalle lo trae. */
+  weight?: number | null;
 }
 
 export interface Appointment {
@@ -60,6 +62,10 @@ export interface Appointment {
   patientId: string;
   patientName: string;
   service: string;
+  /** Id del servicio del catálogo, si se conoce. */
+  serviceId?: string;
+  /** Precio que quedó fijo en la cita, si el backend lo manda. */
+  price?: number;
   professionalId: string;
   /** Inicio en ms. */
   start: number;
@@ -72,6 +78,8 @@ export interface Appointment {
 export interface NewAppointment {
   patientId: string;
   service: string;
+  serviceId: string;
+  note?: string;
   professionalId: string;
   start: number;
   minutes: number;

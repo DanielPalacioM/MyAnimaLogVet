@@ -33,6 +33,7 @@ export interface PatientDto {
   /** Solo en el detalle. */
   sex?: string | null;
   birthDate?: string | null;
+  weight?: number | null;
 }
 
 export interface UnlinkClientDto {

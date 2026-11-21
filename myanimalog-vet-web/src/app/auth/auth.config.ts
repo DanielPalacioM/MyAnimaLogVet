@@ -8,8 +8,11 @@ export const AUTH_API = `${USER_API}/auth`;
 export const VET_ORIGIN = environment.vetApiUrl;
 export const VET_API = `${VET_ORIGIN}/api/veterinary`;
 
+/** calendar-service: citas de la clínica (token de clínica). Incluye `/api`. */
+export const CALENDAR_API = environment.calendarApiUrl;
+
 /** Peticiones a estos orígenes llevan el token; nunca las de otros. */
-export const API_ORIGINS: readonly string[] = [USER_API, VET_ORIGIN].filter((o, i, all) => all.indexOf(o) === i);
+export const API_ORIGINS: readonly string[] = [USER_API, VET_ORIGIN, CALENDAR_API].filter((o, i, all) => all.indexOf(o) === i);
 
 /** Endpoints que no llevan token ni reintentan con refresh. */
 export const PUBLIC_ENDPOINTS: readonly string[] = [

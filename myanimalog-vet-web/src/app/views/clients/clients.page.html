@@ -78,10 +78,8 @@
       </div>
       <div class="ss-contact">
         <div>
-          @if (c.phone) { <span><vet-icon name="phone" [size]="14" />{{ c.phone }}</span> }
-          @if (c.email) { <span><vet-icon name="users" [size]="14" />{{ c.email }}</span> } @else { <span>Sin correo ni teléfono: el dueño aún no los comparte.</span> }
+          @if (c.email) { <span><vet-icon name="users" [size]="14" />{{ c.email }}</span> } @else { <span>Sin correo: el dueño aún no lo comparte.</span> }
         </div>
-        @if (c.phone) { <button type="button" class="ss-btn" (click)="call(c.phone)"><vet-icon name="phone" [size]="14" />Llamar</button> }
       </div>
       <div class="ss-hr"></div>
       <h3 class="ss-title">Mascotas compartidas · {{ c.pets.length }}</h3>

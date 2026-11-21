@@ -1,4 +1,6 @@
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject, signal } from '@angular/core';
+import { errorMessage } from '@services/api-error';
+import { AppointmentAction } from '@services/api/calendar.api';
 import { AGENDA_END_HOUR, AGENDA_START_HOUR, AgendaService, HOUR_PX, LUNCH } from '@services/agenda/agenda.service';
 import { Appointment, AppointmentStatus, STATUS_COLOR, STATUS_LABEL } from '@services/clinic/clinic.models';
 import { ClinicStore } from '@services/clinic/clinic.store';
@@ -34,6 +36,16 @@ export class AgendaPage {
   protected readonly store = inject(ClinicStore);
   private readonly actions = inject(PanelActionsService);
   private readonly router = inject(Router);
+  private readonly destroyRef = inject(DestroyRef);
+  /** Una acción sobre la cita está en curso (evita doble clic). */
+  protected readonly busy = signal(false);
+
+  constructor() {
+    this.agenda.ensureLoaded();
+    // Las solicitudes de la app llegan solas: se vuelve a pedir el mes cada minuto mientras la agenda está abierta.
+    const timer = setInterval(() => this.agenda.reload(), 60_000);
+    this.destroyRef.onDestroy(() => clearInterval(timer));
+  }
 
   protected readonly weekdays = WEEKDAYS;
   protected readonly weekdayNames = WEEKDAY_NAMES;
@@ -173,10 +185,45 @@ export class AgendaPage {
     this.actions.newAppointment({ day });
   }
 
+  /**
+   * Cambia el estado de la cita en el servidor y avisa el resultado. Rechazar pide el motivo (el servidor lo exige);
+   * cancelar lo pide opcional. Si el servidor responde con error, la cita queda como estaba y se muestra el motivo.
+   */
   protected change(a: Appointment, status: AppointmentStatus, message: string): void {
-    this.agenda.setStatus(a.id, status);
-    this.actions.toast(message);
-    if (status === 'CANCELLED') this.close();
+    if (this.busy()) return;
+    const run = (action: AppointmentAction, reason?: string) => {
+      this.busy.set(true);
+      this.agenda.act(a.id, action, reason).subscribe({
+        next: () => {
+          this.busy.set(false);
+          this.actions.toast(message);
+          if (status === 'CANCELLED') this.close();
+        },
+        error: (e: unknown) => {
+          this.busy.set(false);
+          this.actions.toast(errorMessage(e));
+        },
+      });
+    };
+    switch (status) {
+      case 'CONFIRMED': return run('confirm');
+      case 'CHECKED_IN': return run('check-in');
+      case 'COMPLETED': return run('complete');
+      case 'NO_SHOW': return run('no-show');
+      case 'CANCELLED': {
+        const rejecting = a.status === 'REQUESTED';
+        this.actions
+          .askReason({
+            title: rejecting ? 'Rechazar la solicitud' : 'Cancelar la cita',
+            message: `${a.patientName} · ${a.service}. El dueño recibe el motivo en una notificación.`,
+            confirmLabel: rejecting ? 'Rechazar solicitud' : 'Cancelar cita',
+            required: rejecting,
+          })
+          .subscribe((reason) => reason !== undefined && run(rejecting ? 'reject' : 'cancel', reason || undefined));
+        return;
+      }
+      default: return;
+    }
   }
 
   protected accept(a: Appointment): void {
@@ -187,9 +234,9 @@ export class AgendaPage {
     this.change(a, 'CANCELLED', `Solicitud de ${a.patientName} rechazada`);
   }
 
-  protected price(service: string): string {
-    const found = this.store.catalog().find((s) => s.name === service);
-    return found ? money(found.price) : 'Sin precio';
+  protected price(a: Appointment): string {
+    const value = a.price ?? this.store.catalog().find((s) => s.name === a.service)?.price;
+    return value === undefined ? 'Sin precio' : money(value);
   }
 
   protected minutesUntil(a: Appointment): number {
@@ -208,10 +255,6 @@ export class AgendaPage {
 
   protected reschedule(a: Appointment): void {
     this.close();
-    this.actions.newAppointment({ patientId: a.patientId });
-  }
-
-  protected call(phone: string): void {
-    window.open(`tel:${phone.replace(/\s/g, '')}`, '_self');
+    this.actions.newAppointment({ patientId: a.patientId, day: a.start, reschedule: a });
   }
 }

@@ -368,3 +368,16 @@ Una fase está terminada cuando se cumplen los criterios de aceptación de su se
 5. **¿Qué se hace con las categorías de documento `DEWORMING` y `ALLERGY_REPORT`?** Se mantienen como adjuntos (un PDF del laboratorio o del carnet), pero ya no son la fuente del dato.
 6. **Diseño pendiente en Figma:** pantallas móviles para registrar alergias, registrar desparasitación, tarjetas del perfil y selector de esterilización; y en el panel, estados "sin confirmar" y "sin preguntar". Se quita además el chip de Microchip de la cabecera del diseño del panel.
 7. **Datos de salud y consentimiento:** las alergias y los registros son información de la mascota, pero van ligados al dueño. Conviene que asesoría legal revise el texto de consentimiento al vincularse y al compartir.
+
+
+---
+
+## 11. Estado de implementación (20 de noviembre de 2026)
+
+| Parte | Estado |
+|---|---|
+| **Backend Medical** | Hecho: `/allergies`, `/dewormings`, `/pets/{id}/clinical-profile` y `clinical-summary`, con `/corrections` (carpetas D9 y V10 de la colección). **Falta publicar en el gateway** esas rutas (hoy 404) y que `/pets/{id}/clinical-*` vayan a Medical, no a Pets. |
+| **App móvil** | Hecho: sección propia de Desparasitación (estado por tipo, historial, registrar, anular), pantalla "Salud y alertas" (esterilización y alergias: agregar, resolver, marcar por error), tarjetas y aviso de alergia grave en el perfil. Falta: preguntas en el registro de mascota, recordatorios en calendario y notificaciones. |
+| **Panel Vet** | Hecho: pestañas **Desparasitación** y **Alergias** en la historia, chips de esterilización y alergias en la cabecera, bloque "Prevención" en el Resumen, diálogos para registrar alergia, **confirmar** la del dueño, confirmar esterilización y registrar desparasitación, y aviso de alergia al agregar un medicamento que coincide. Falta: filtro "Desparasitación vencida" en Pacientes y contador en Inicio. |
+
+**Decisión de diseño móvil:** la desparasitación va como sección propia junto a Vacunas (no dentro), porque sus datos son distintos; comparte el lenguaje de estados y la línea visual de vacunas.

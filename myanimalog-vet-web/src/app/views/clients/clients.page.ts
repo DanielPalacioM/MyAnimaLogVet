@@ -106,10 +106,6 @@ export class ClientsPage implements OnInit {
     void this.router.navigate(['/pacientes'], { queryParams: { q: name } });
   }
 
-  protected call(phone: string): void {
-    window.open(`tel:${phone.replace(/\s/g, '')}`, '_self');
-  }
-
   protected remove(c: Client): void {
     this.actions
       .confirm({

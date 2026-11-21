@@ -15,6 +15,11 @@
   </header>
 
   <vet-soon-note feature="appointments" />
+  @if (store.appointmentsState() === 'error') {
+    <p class="reg-alert reg-alert--error" role="alert">
+      No pudimos cargar las citas. <button type="button" class="ss-link" (click)="agenda.reload()">Reintentar</button>
+    </p>
+  }
 
   <div class="body">
     <aside class="left">
@@ -171,16 +176,14 @@
         </div>
         <div class="ss-row">
           <span class="ss-tile"><vet-icon name="tag" [size]="16" /></span>
-          <div><strong>{{ a.service }}</strong><small>{{ a.minutes }} min · {{ price(a.service) }}</small></div>
+          <div><strong>{{ a.service }}</strong><small>{{ a.minutes }} min · {{ price(a) }}</small></div>
         </div>
         <div class="ss-hr"></div>
         <div class="ss-owner">
           <div>
             <small>DUEÑO</small>
             <strong>{{ p.owner }}</strong>
-            <span class="ss-phone"><vet-icon name="phone" [size]="13" />{{ p.phone }}</span>
           </div>
-          <a class="ss-btn" [href]="'tel:' + p.phone.replaceAll(' ', '')"><vet-icon name="phone" [size]="14" />Llamar</a>
         </div>
         @if (p.inApp) {
           <p class="ss-share" style="margin: 0"><vet-icon name="shield" [size]="14" />Comparte la historia de {{ p.name }} con la clínica</p>
@@ -195,6 +198,26 @@
           <span></span>
           <button type="button" class="ss-link" (click)="seeFile(p.name)">Ver ficha <vet-icon name="arrow" [size]="14" /></button>
         </div>
+      } @else {
+        <!-- La mascota ya no está entre los pacientes (acceso revocado): se muestra lo que dice la cita. -->
+        <div class="ss-hero">
+          <span class="ss-hero-av"><vet-icon name="paw" [size]="26" /></span>
+          <div><h2>{{ a.patientName }}</h2><p>{{ a.service }} · {{ a.minutes }} min</p></div>
+        </div>
+        <div class="ss-chips">
+          <span class="ss-chip" [style.color]="colors[a.status].fg" [style.background]="colors[a.status].bg">{{ statusLabel[a.status] }}</span>
+        </div>
+        <div class="ss-row">
+          <span class="ss-tile"><vet-icon name="cal" [size]="16" /></span>
+          <div><strong>{{ dateLabel(a.start) }}</strong><small>{{ range(a) }} {{ suffix(a) }}</small></div>
+        </div>
+        <div class="ss-row">
+          <span class="ss-tile"><vet-icon name="badge" [size]="16" /></span>
+          <div><strong>{{ pro?.name }}</strong><small>{{ pro?.role }}</small></div>
+        </div>
+        @if (a.note) {
+          <div class="ss-note"><vet-icon name="note" [size]="16" /><div><b>Nota del dueño al pedir la cita</b><span>{{ a.note }}</span></div></div>
+        }
       }
       <ng-container footer>
         @switch (a.status) {

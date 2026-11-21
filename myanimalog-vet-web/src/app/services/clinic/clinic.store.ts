@@ -4,13 +4,32 @@ import { ClinicContextService } from '@auth/services/clinic-context.service';
 import { catchError, EMPTY, expand, forkJoin, from, map, mergeMap, Observable, of, reduce, switchMap, tap } from 'rxjs';
 import { ApiError } from '../api-error';
 import { ClinicProfileDto, SubscriptionDto } from '../api/api.models';
+import { AppointmentAction, AppointmentDto, CalendarApi } from '../api/calendar.api';
+import { CatalogApi, ServiceBody } from '../api/catalog.api';
 import { ClinicApi } from '../api/clinic.api';
+import { ScheduleApi } from '../api/schedule.api';
 import { ClientDto, LinkApi, PageDto, PatientDto } from '../api/link.api';
-import { clientFrom, hasProfessionalProfile, invitationFrom, memberFrom, patientFrom, profileFrom, roleFromApi, roleToApi, withDetail } from '../api/mappers';
+import {
+  appointmentFrom,
+  blockFrom,
+  blockToApi,
+  categoryToApi,
+  clientFrom,
+  hasProfessionalProfile,
+  invitationFrom,
+  memberFrom,
+  patientFrom,
+  profileFrom,
+  roleFromApi,
+  roleToApi,
+  scheduleFrom,
+  scheduleToApi,
+  serviceFrom,
+  withDetail,
+} from '../api/mappers';
 import { TeamApi } from '../api/team.api';
 import {
   Appointment,
-  AppointmentStatus,
   Client,
   ClinicBlock,
   ClinicProfile,
@@ -25,9 +44,12 @@ import {
   Professional,
   ScheduleDay,
 } from './clinic.models';
-import { at, sameDay } from './date.utils';
+import { FEATURES } from '../features';
+import { addDays, at, sameDay, startOfDay } from './date.utils';
 
 const DAY = 86_400_000;
+/** Al entrar a la clínica se piden las citas de hoy y de los próximos días (solicitudes, "próxima cita" de clientes). */
+const UPCOMING_DAYS = 30;
 /** Tamaño de página al pedir clientes y pacientes (se piden todas las páginas). */
 const PEOPLE_PAGE = 100;
 const COLORS = ['#F5A623', '#BDB8EE', '#9FE3D6', '#FFE2B8', '#FCE3E3', '#D9F5EF'];
@@ -43,15 +65,18 @@ export type LoadState = 'idle' | 'loading' | 'ready' | 'error';
 /**
  * Datos de la clínica con la que se trabaja.
  *
- * **Conectado al backend:** perfil y configuración, logo, código de vinculación, plan, equipo e invitaciones.
- * **Sin backend todavía** (pacientes, citas, servicios, horario, bloqueos): quedan vacíos; no se inventan datos.
- * Cuando esos servicios existan, se cargan aquí mismo y las vistas no cambian.
+ * **Conectado al backend:** perfil y configuración, logo, código de vinculación, plan, equipo e invitaciones,
+ * clientes y pacientes (mascotas compartidas), catálogo de servicios y citas (calendar-service).
+ * horario de atención y bloqueos. **Sin backend todavía:** horarios por profesional y registrar pacientes sin app.
  */
 @Injectable({ providedIn: 'root' })
 export class ClinicStore {
   private readonly clinicApi = inject(ClinicApi);
   private readonly teamApi = inject(TeamApi);
   private readonly linkApi = inject(LinkApi);
+  private readonly calendarApi = inject(CalendarApi);
+  private readonly catalogApi = inject(CatalogApi);
+  private readonly scheduleApi = inject(ScheduleApi);
   private readonly session = inject(SessionService);
   private readonly context = inject(ClinicContextService);
 
@@ -66,12 +91,22 @@ export class ClinicStore {
   /** Código `VET-XXXXXXXX` para vincular dueños. Solo se conoce si el perfil lo trae o al generarlo. */
   readonly linkCode = signal<string | null>(null);
 
-  // ---- Sin backend todavía ----
   readonly patients = signal<Patient[]>([]);
-  readonly appointments = signal<Appointment[]>([]);
+  /** Citas tal como llegan del calendar-service. */
+  private readonly appointmentDtos = signal<AppointmentDto[]>([]);
+  readonly appointmentsState = signal<LoadState>('idle');
+  /** Citas del panel: se arman con los pacientes y el catálogo, así se completan solas cuando estos terminan de cargar. */
+  readonly appointments = computed<Appointment[]>(() => {
+    const patients = this.patients();
+    const catalog = this.catalog();
+    return this.appointmentDtos().map((dto) => appointmentFrom(dto, patients, catalog));
+  });
+  readonly catalog = signal<ClinicService[]>([]);
+  readonly catalogState = signal<LoadState>('idle');
+
+  // ---- Sin backend todavía ----
   /** Pacientes a los que ya se les avisó por la vacuna vencida. */
   readonly notifiedVaccines = signal<ReadonlySet<string>>(new Set());
-  readonly catalog = signal<ClinicService[]>([]);
   readonly schedule = signal<ScheduleDay[]>([]);
   readonly blocks = signal<ClinicBlock[]>([]);
 
@@ -172,6 +207,67 @@ export class ClinicStore {
     this.loadTeam().subscribe();
     this.loadLinkCode().subscribe();
     this.loadPeople().subscribe();
+    // Catálogo y horario aún no existen en el backend (VET-31/32): con la función apagada no se hace la llamada.
+    if (FEATURES.catalog) this.loadCatalog().subscribe();
+    if (FEATURES.schedule) this.loadSchedule().subscribe();
+    const today = startOfDay(Date.now());
+    this.loadAppointments(today, addDays(today, UPCOMING_DAYS)).subscribe();
+  }
+
+  /** Catálogo de servicios (`GET /{id}/services`). Es lo que se puede agendar. */
+  loadCatalog(): Observable<void> {
+    const id = this.clinicId;
+    if (!id) return EMPTY;
+    this.catalogState.set('loading');
+    return this.catalogApi.list(id).pipe(
+      tap((list) => {
+        this.catalog.set(list.map(serviceFrom));
+        this.catalogState.set('ready');
+      }),
+      map(() => undefined),
+      catchError(() => {
+        this.catalogState.set('error');
+        return of(undefined);
+      }),
+    );
+  }
+
+  /**
+   * Citas de `[from, to)`: reemplaza las que ya había en ese rango y deja las demás. Así la agenda puede pedir
+   * el mes que mira sin borrar lo que cargó Inicio.
+   */
+  /** El backend rechaza rangos de más de 31 días (400 VALIDATION_ERROR): se pide por tramos de 30 y se juntan. */
+  private listRange(id: string, from: number, to: number): Observable<AppointmentDto[]> {
+    const chunks: [number, number][] = [];
+    for (let a = from; a < to; ) {
+      const b = Math.min(addDays(a, 30), to);
+      chunks.push([a, b]);
+      a = b;
+    }
+    if (chunks.length <= 1) return this.calendarApi.list(id, from, to);
+    return forkJoin(chunks.map(([a, b]) => this.calendarApi.list(id, a, b))).pipe(map((parts) => parts.flat()));
+  }
+
+  loadAppointments(from: number, to: number): Observable<void> {
+    const id = this.clinicId;
+    if (!id) return EMPTY;
+    this.appointmentsState.set('loading');
+    return this.listRange(id, from, to).pipe(
+      tap((list) => {
+        if (this.clinicId !== id) return; // cambió de clínica mientras tanto
+        const inRange = (dto: AppointmentDto) => {
+          const t = new Date(dto.startsAt).getTime();
+          return t >= from && t < to;
+        };
+        this.appointmentDtos.update((all) => [...all.filter((dto) => !inRange(dto)), ...list]);
+        this.appointmentsState.set('ready');
+      }),
+      map(() => undefined),
+      catchError(() => {
+        this.appointmentsState.set('error');
+        return of(undefined);
+      }),
+    );
   }
 
   /**
@@ -256,7 +352,9 @@ export class ClinicStore {
     this.clientList.set([]);
     this.peopleState.set('idle');
     this.patients.set([]);
-    this.appointments.set([]);
+    this.appointmentDtos.set([]);
+    this.appointmentsState.set('idle');
+    this.catalogState.set('idle');
     this.catalog.set([]);
     this.schedule.set([]);
     this.blocks.set([]);
@@ -452,15 +550,53 @@ export class ClinicStore {
     );
   }
 
-  addAppointment(input: NewAppointment): Appointment {
-    const patient = this.patient(input.patientId)!;
-    const appointment: Appointment = { id: `a-${Date.now()}`, patientName: patient.name, status: 'CONFIRMED', source: 'CLINIC', ...input };
-    this.appointments.update((list) => [...list, appointment]);
-    return appointment;
+  /** La clínica agenda (nace confirmada). El servidor valida horario, empleado elegible y franja libre. */
+  addAppointment(input: NewAppointment): Observable<void> {
+    const id = this.clinicId;
+    if (!id) return EMPTY;
+    return this.calendarApi
+      .create(id, {
+        serviceId: input.serviceId,
+        petId: input.patientId,
+        employeeId: input.professionalId,
+        startsAt: new Date(input.start).toISOString(),
+        ...(input.note ? { notes: input.note } : {}),
+      })
+      .pipe(
+        tap((dto) => this.upsertAppointment(dto)),
+        map(() => undefined),
+      );
   }
 
-  setStatus(id: string, status: AppointmentStatus): void {
-    this.appointments.update((list) => list.map((a) => (a.id === id ? { ...a, status } : a)));
+  /** Confirmar, rechazar, marcar llegada, atendida, no asistió o cancelar. La respuesta trae la cita ya actualizada. */
+  act(appointmentId: string, action: AppointmentAction, reason?: string): Observable<void> {
+    const id = this.clinicId;
+    if (!id) return EMPTY;
+    return this.calendarApi.act(id, appointmentId, action, reason).pipe(
+      tap((dto) => this.upsertAppointment(dto, appointmentId)),
+      map(() => undefined),
+    );
+  }
+
+  /** Reprograma a otra hora (el servidor revalida la disponibilidad: `409 SLOT_UNAVAILABLE` si está ocupada). */
+  reschedule(appointmentId: string, start: number): Observable<void> {
+    const id = this.clinicId;
+    if (!id) return EMPTY;
+    return this.calendarApi.reschedule(id, appointmentId, new Date(start).toISOString()).pipe(
+      tap((dto) => this.upsertAppointment(dto, appointmentId)),
+      map(() => undefined),
+    );
+  }
+
+  /** Mezcla la respuesta del servidor con lo que ya había de la cita (la respuesta puede traer solo algunos campos). */
+  private upsertAppointment(dto: AppointmentDto, knownId?: string): void {
+    const id = dto.id ?? knownId;
+    if (!id) return;
+    this.appointmentDtos.update((all) => {
+      const old = all.find((a) => a.id === id);
+      const merged = { ...old, ...dto, id } as AppointmentDto;
+      return old ? all.map((a) => (a.id === id ? merged : a)) : [...all, merged];
+    });
   }
 
   /**
@@ -510,40 +646,87 @@ export class ClinicStore {
     this.notifiedVaccines.update((s) => new Set(s).add(patientId));
   }
 
-  addService(input: Omit<ClinicService, 'id'>): ClinicService {
-    const service: ClinicService = { id: `s-${Date.now()}`, ...input };
-    this.catalog.update((list) => [...list, service]);
-    return service;
+  // ---------------------------------------------------------------- Catálogo
+
+  addService(input: Omit<ClinicService, 'id' | 'active'>): Observable<void> {
+    const id = this.clinicId;
+    if (!id) return EMPTY;
+    return this.catalogApi.create(id, serviceBody(input)).pipe(switchMap(() => this.loadCatalog()));
   }
 
-  updateService(id: string, patch: Partial<ClinicService>): void {
-    this.catalog.update((list) => list.map((s) => (s.id === id ? { ...s, ...patch } : s)));
+  /** Solo manda lo que cambió y recarga el catálogo. Activar o desactivar usa `active`. */
+  updateService(serviceId: string, patch: Partial<ClinicService>): Observable<void> {
+    const id = this.clinicId;
+    if (!id) return EMPTY;
+    const current = this.catalog().find((s) => s.id === serviceId);
+    if (patch.active === false) {
+      return this.catalogApi.deactivate(id, serviceId).pipe(switchMap(() => this.loadCatalog()));
+    }
+    const body: Partial<ServiceBody> & { active?: boolean } = current ? serviceBody({ ...current, ...patch }) : {};
+    if (patch.active) body.active = true;
+    return this.catalogApi.update(id, serviceId, body).pipe(switchMap(() => this.loadCatalog()));
   }
 
-  /** Un servicio con citas no se borra: devuelve false y el llamador lo desactiva. */
-  removeService(id: string): boolean {
-    const service = this.catalog().find((s) => s.id === id);
-    if (!service) return true;
-    if (this.appointments().some((a) => a.service === service.name)) return false;
-    this.catalog.update((list) => list.filter((s) => s.id !== id));
-    return true;
+  /** Un servicio no se borra (hay citas que lo referencian): se desactiva. */
+  deactivateService(serviceId: string): Observable<void> {
+    return this.updateService(serviceId, { active: false });
   }
 
-  setSchedule(days: ScheduleDay[]): void {
-    this.schedule.set(days);
+  // ---------------------------------------------------------------- Horario y bloqueos
+
+  /** Horario de atención y bloqueos de los próximos 12 meses. Si falla, quedan como estaban. */
+  loadSchedule(): Observable<void> {
+    const id = this.clinicId;
+    if (!id) return EMPTY;
+    const from = startOfDay(Date.now());
+    return forkJoin({
+      hours: this.scheduleApi.businessHours(id),
+      blocks: this.scheduleApi.blocks(id, from, addDays(from, 365)),
+    }).pipe(
+      tap(({ hours, blocks }) => {
+        if (this.clinicId !== id) return;
+        // Sin tramos guardados no hay horario configurado: la lista queda vacía y no restringe nada.
+        this.schedule.set(hours.length ? scheduleFrom(hours) : []);
+        this.blocks.set(blocks.map(blockFrom).sort((a, b) => a.date - b.date));
+      }),
+      map(() => undefined),
+      catchError(() => of(undefined)),
+    );
   }
 
-  addBlock(input: Omit<ClinicBlock, 'id'>): void {
-    this.blocks.update((list) => [...list, { id: `b-${Date.now()}`, ...input }].sort((a, b) => a.date - b.date));
+  /** Guarda la semana completa y la vuelve a leer. */
+  saveSchedule(days: ScheduleDay[]): Observable<void> {
+    const id = this.clinicId;
+    if (!id) return EMPTY;
+    return this.scheduleApi.replaceBusinessHours(id, scheduleToApi(days)).pipe(switchMap(() => this.loadSchedule()));
   }
 
-  removeBlock(id: string): void {
-    this.blocks.update((list) => list.filter((b) => b.id !== id));
+  addBlock(input: Omit<ClinicBlock, 'id'>): Observable<void> {
+    const id = this.clinicId;
+    if (!id) return EMPTY;
+    return this.scheduleApi.createBlock(id, blockToApi(input)).pipe(switchMap(() => this.loadSchedule()));
+  }
+
+  removeBlock(blockId: string): Observable<void> {
+    const id = this.clinicId;
+    if (!id) return EMPTY;
+    return this.scheduleApi.deleteBlock(id, blockId).pipe(switchMap(() => this.loadSchedule()));
   }
 
   setMemberSchedule(memberId: string, schedule: string): void {
     this.members.update((list) => list.map((m) => (m.id === memberId ? { ...m, schedule } : m)));
   }
+}
+
+function serviceBody(s: Pick<ClinicService, 'name' | 'category' | 'minutes' | 'price' | 'online' | 'professionalIds'>): ServiceBody {
+  return {
+    name: s.name.trim(),
+    category: categoryToApi(s.category),
+    durationMinutes: s.minutes,
+    price: s.price,
+    bookableOnline: s.online,
+    employeeIds: s.professionalIds,
+  };
 }
 
 function pickDefined<T extends object>(obj: T): Partial<T> {

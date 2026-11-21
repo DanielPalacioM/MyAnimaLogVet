@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { MatDialogRef } from '@angular/material/dialog';
+import { errorMessage } from '@services/api-error';
 import { ScheduleDay } from '@services/clinic/clinic.models';
 import { ClinicStore } from '@services/clinic/clinic.store';
 import { VetModal } from '../modal/modal.component';
@@ -51,7 +52,7 @@ interface Row {
       }
       <ng-container footer>
         <button type="button" class="btn btn--ghost" (click)="ref.close()">Cancelar</button>
-        <button type="button" class="btn" (click)="save()">Guardar horario</button>
+        <button type="button" class="btn" [disabled]="saving()" (click)="save()">Guardar horario</button>
       </ng-container>
     </vet-modal>
   `,
@@ -81,9 +82,18 @@ export class ScheduleDialog {
   protected readonly names = DAY_NAMES;
   protected readonly error = signal('');
 
+  /** Sin horario guardado, se propone lunes a viernes de 8 a 12 y de 2 a 6, sábado de 8 a 12 y domingo cerrado. */
   protected readonly rows = signal<Row[]>(
-    this.store.schedule().map((d) => ({ day: d.day, open: d.open, a: d.ranges[0] ?? ['08:00', '12:00'], b: d.ranges[1] ?? null })),
+    this.store.schedule().length
+      ? this.store.schedule().map((d) => ({ day: d.day, open: d.open, a: d.ranges[0] ?? ['08:00', '12:00'], b: d.ranges[1] ?? null }))
+      : Array.from({ length: 7 }, (_, day): Row => ({
+          day,
+          open: day < 6,
+          a: ['08:00', '12:00'],
+          b: day < 5 ? ['14:00', '18:00'] : null,
+        })),
   );
+  protected readonly saving = signal(false);
 
   protected update(i: number, patch: Partial<Row>): void {
     this.rows.update((list) => list.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
@@ -110,7 +120,14 @@ export class ScheduleDialog {
       if (ranges.length === 2 && ranges[1][0] < ranges[0][1]) return this.error.set(`${name}: el segundo tramo debe empezar después de que termine el primero.`);
     }
     const days: ScheduleDay[] = this.rows().map((r) => ({ day: r.day, open: r.open, ranges: r.open ? ([r.a, r.b].filter(Boolean) as [string, string][]) : [] }));
-    this.store.setSchedule(days);
-    this.ref.close(true);
+    this.error.set('');
+    this.saving.set(true);
+    this.store.saveSchedule(days).subscribe({
+      next: () => this.ref.close(true),
+      error: (e: unknown) => {
+        this.saving.set(false);
+        this.error.set(errorMessage(e));
+      },
+    });
   }
 }

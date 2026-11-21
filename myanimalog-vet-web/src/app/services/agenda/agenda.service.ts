@@ -1,4 +1,6 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
+import { SessionService } from '@auth/services/session.service';
+import { AppointmentAction } from '../api/calendar.api';
 import { Appointment, isActive } from '../clinic/clinic.models';
 import { ClinicStore } from '../clinic/clinic.store';
 import { addDays, sameDay, startOfDay, startOfWeek } from '../clinic/date.utils';
@@ -16,6 +18,9 @@ export const LUNCH = { from: 12, to: 13 };
 @Injectable({ providedIn: 'root' })
 export class AgendaService {
   private readonly store = inject(ClinicStore);
+  private readonly session = inject(SessionService);
+  /** Meses ya pedidos al servidor (clínica + año-mes), para no repetir la llamada al navegar. */
+  private readonly loadedMonths = new Set<string>();
 
   readonly day = signal(startOfDay(Date.now()));
   readonly view = signal<AgendaView>('day');
@@ -81,6 +86,7 @@ export class AgendaService {
   goTo(day: number): void {
     this.day.set(startOfDay(day));
     this.month.set(startOfDay(day));
+    this.ensureLoaded();
   }
 
   today(): void {
@@ -95,9 +101,31 @@ export class AgendaService {
     const d = new Date(this.month());
     d.setMonth(d.getMonth() + direction, 1);
     this.month.set(d.getTime());
+    this.ensureLoaded();
+  }
+
+  /**
+   * Pide al servidor las citas del mes que se ve (con una semana de margen a cada lado, por la vista de semana).
+   * Cada mes se pide una sola vez; `reload` lo fuerza.
+   */
+  ensureLoaded(force = false): void {
+    const clinic = this.session.clinic()?.veterinaryId;
+    if (!clinic) return;
+    const first = new Date(this.month());
+    first.setDate(1);
+    const key = `${clinic}|${first.getFullYear()}-${first.getMonth()}`;
+    if (!force && this.loadedMonths.has(key)) return;
+    this.loadedMonths.add(key);
+    const end = new Date(first.getFullYear(), first.getMonth() + 1, 1).getTime();
+    this.store.loadAppointments(addDays(startOfDay(first.getTime()), -7), addDays(end, 7)).subscribe();
+  }
+
+  /** Vuelve a pedir el mes actual (llegan solicitudes nuevas de la app mientras la agenda está abierta). */
+  reload(): void {
+    this.ensureLoaded(true);
   }
 
   // ---- Acciones sobre citas ----
 
-  setStatus = (id: string, status: Appointment['status']) => this.store.setStatus(id, status);
+  act = (id: string, action: AppointmentAction, reason?: string) => this.store.act(id, action, reason);
 }

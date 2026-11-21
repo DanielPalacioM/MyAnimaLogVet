@@ -1,241 +1,658 @@
 <nav class="crumbs" aria-label="Ruta">
   <a routerLink="/pacientes">Pacientes</a>
   <span aria-hidden="true">/</span>
-  <span>Historia clínica</span>
+  <b>{{ patient()?.name || 'Paciente' }}</b>
+  <span aria-hidden="true">/</span>
+  <b>Historia clínica</b>
 </nav>
 
-<header class="head">
-  <div>
-    <h1>Historia clínica</h1>
-    <p class="sub">Historia compartida por el dueño · {{ petId | slice: 0 : 8 }}…</p>
+<!-- Cabecera del paciente (Figma 1998:299) -->
+<header class="pet">
+  <div class="pet__avatar" aria-hidden="true"><vet-icon name="paw" [size]="29" /></div>
+  <div class="pet__data">
+    <div class="pet__name">
+      <h1>{{ patient()?.name || 'Historia clínica' }}</h1>
+      <span class="pill pill--teal"><i></i>Historia compartida por el dueño</span>
+    </div>
+    @if (petLine(); as line) { <p class="pet__line">{{ line }}</p> }
+    @if (summary().data?.allergies?.length || neuteredChip()) {
+      <div class="pet__chips">
+        @for (a of summary().data?.allergies ?? []; track a) { <span class="tag tag--warn">Alérgico a {{ a }}</span> }
+        @if (!summary().data?.allergies?.length && allergyNote()) { <span class="tag">Alergias sin preguntar</span> }
+        @if (neuteredChip(); as n) { <span class="tag" [ngClass]="'tag--' + n.tone">{{ n.label }}</span> }
+      </div>
+    }
   </div>
-  <div class="actions">
+  <span class="grow"></span>
+  @if (patient(); as p) {
+    <div class="pet__owner">
+      <small>DUEÑO</small>
+      <strong>{{ p.owner }}</strong>
+      @if (p.phone) { <span>{{ p.phone }}</span> }
+    </div>
+    <span class="pet__sep" aria-hidden="true"></span>
+  }
+  <div class="pet__actions">
     @if (canWriteClinical()) {
       <button type="button" class="vet-btn vet-btn--primary" (click)="add('visit')"><vet-icon name="plus" [size]="16" />Registrar visita</button>
     }
-    @if (canNursing()) {
-      <button type="button" class="vet-btn vet-btn--secondary" (click)="add('vaccine')">Aplicar vacuna</button>
-      <button type="button" class="vet-btn vet-btn--secondary" (click)="add('weight')">Registrar peso</button>
-    }
+    <div class="pet__row">
+      <button type="button" class="vet-btn vet-btn--secondary vet-btn--sm" (click)="newAppointment()">Nueva cita</button>
+      <button type="button" class="vet-btn vet-btn--secondary vet-btn--sm" (click)="uploadDoc()">Subir documento</button>
+    </div>
   </div>
 </header>
 
-@if (summary().data; as s) {
-  <div class="chips" aria-label="Datos clave">
-    @for (a of s.allergies; track a) {
-      <span class="chip chip--warn">Alergia: {{ a }}</span>
-    }
-    @if (lastWeight(); as w) {
-      <span class="chip">Último peso {{ w }}</span>
-    }
-    @if (s.vaccines; as v) {
-      <span class="chip chip--ok">{{ v.valid }} vigentes</span>
-      @if (v.dueSoon) { <span class="chip chip--warn">{{ v.dueSoon }} por vencer</span> }
-      @if (v.overdue) { <span class="chip chip--bad">{{ v.overdue }} vencidas</span> }
-    }
-  </div>
-}
-
+<!-- Pestañas (Figma 1998:337) -->
 <div class="tabs" role="tablist" aria-label="Secciones de la historia">
   @for (t of tabs(); track t.value) {
     <button type="button" role="tab" [class.on]="tab() === t.value" [attr.aria-selected]="tab() === t.value" (click)="select(t.value)">
       {{ t.label }}@if (t.count !== null) { <small>{{ t.count }}</small> }
     </button>
   }
+  <span class="grow"></span>
+  <span class="tabs__note">{{ tabNote() }}</span>
 </div>
 
 @if (basicOnly()) {
   <p class="note">Con tu rol ves el resumen básico. Consultas, diagnósticos, laboratorios, cirugías y documentos son del equipo clínico.</p>
 }
 
-<section class="panel" role="tabpanel">
+<section role="tabpanel">
   @switch (tab()) {
+    <!-- ───────── Resumen (1997:225) -->
     @case ('summary') {
-      @if (summary().loading) {
+      @if (visits().loading && summary().loading) {
         <p class="state" role="status">Cargando el resumen…</p>
-      } @else if (summary().error; as e) {
-        <div class="state"><p role="alert">{{ e }}</p><button type="button" class="vet-btn vet-btn--secondary" (click)="reload()">Reintentar</button></div>
       } @else {
-        @if (summary().data; as s) {
-          <div class="grid">
-            <article class="card">
-              <h2>Alertas</h2>
-              @for (a of s.allergies; track a) { <p class="row">Alergia a {{ a }}</p> } @empty { <p class="muted">Sin alergias registradas.</p> }
+        @if (summary().error; as e) { @if (timelineTotal() === 0) { <p class="note" role="alert">{{ e }} <button type="button" class="link" (click)="reload()">Reintentar</button></p> } }
+        <div class="cols">
+          @if (!basicOnly()) {
+            <article class="card card--flush">
+              <div class="card__head">
+                <h2>Línea de tiempo</h2>
+                <div class="seg" role="group" aria-label="Origen">
+                  @for (s of timelineScopes; track s.value) {
+                    <button type="button" [class.on]="timelineScope() === s.value" (click)="timelineScope.set(s.value)">{{ s.label }}</button>
+                  }
+                </div>
+              </div>
+              @for (e of timeline(); track $index) {
+                <div class="tl">
+                  <span class="tl__date">{{ short(e.date) }}</span>
+                  <span class="tl__dot" aria-hidden="true"></span>
+                  <div class="tl__body">
+                    <small>{{ e.kind | uppercase }}</small>
+                    <strong>{{ e.title }}</strong>
+                    @if (e.detail) { <span>{{ e.detail }}</span> }
+                  </div>
+                  @if (e.origin) { <span class="src" [ngClass]="'src--' + e.origin">{{ originLabel(e.origin, e.originName) }}</span> }
+                </div>
+              } @empty {
+                <p class="empty">Todavía no hay registros. Cuando el dueño comparta la historia o la clínica registre algo, aparecerá aquí.</p>
+              }
+              @if (timelineTotal() > timeline().length) {
+                <button type="button" class="more" (click)="select('visits')">Ver los {{ timelineTotal() }} registros</button>
+              }
             </article>
-            <article class="card">
-              <h2>Tratamientos activos</h2>
-              @for (t of s.activeTreatments; track t) { <p class="row">{{ t }}</p> } @empty { <p class="muted">No hay tratamientos activos.</p> }
-            </article>
-          </div>
-        }
-        @if (!basicOnly()) {
-          <h2 class="title">Línea de tiempo</h2>
-          @for (e of timeline(); track $index) {
-            <div class="item">
-              <span class="date">{{ day(e.date) }}</span>
-              <div><strong>{{ e.title }}</strong><small>{{ e.kind }}@if (e.detail) { · {{ e.detail }} }</small></div>
-            </div>
-          } @empty {
-            <p class="muted">Todavía no hay registros. Cuando el dueño comparta la historia o la clínica registre algo, aparecerá aquí.</p>
           }
-        }
+
+          <div class="side">
+            @if (alerts().length) {
+              <article class="alert">
+                <small>ALERTAS CLÍNICAS</small>
+                @for (a of alerts(); track a.title) { <p><b>{{ a.title }}</b>@if (a.detail) { <span>{{ a.detail }}</span> }</p> }
+              </article>
+            }
+            @if (!basicOnly() && vaccineRows().length) {
+              <article class="card card--flush">
+                <div class="card__head"><h2>Vacunas</h2><button type="button" class="link" (click)="select('vaccines')">Ver carnet</button></div>
+                @for (v of currentVaccines().slice(0, 3); track v.id) {
+                  <div class="kv">
+                    <div><strong>{{ v.name }}</strong><small>@if (v.nextDoseDate) { {{ v.state.tone === 'bad' ? 'Venció' : 'Vence' }} el {{ day(v.nextDoseDate) }} } @else { Aplicada el {{ day(v.applicationDate) }} }</small></div>
+                    <span class="chip" [ngClass]="'chip--' + v.state.tone"><i></i>{{ v.state.label }}</span>
+                  </div>
+                }
+              </article>
+            } @else if (summary().data?.vaccines; as v) {
+              <article class="card card--flush">
+                <div class="card__head"><h2>Vacunas</h2></div>
+                <div class="kv"><span>Vigentes</span><span class="chip chip--ok">{{ v.valid }}</span></div>
+                @if (v.dueSoon) { <div class="kv"><span>Por vencer</span><span class="chip chip--warn">{{ v.dueSoon }}</span></div> }
+                @if (v.overdue) { <div class="kv"><span>Vencidas</span><span class="chip chip--bad">{{ v.overdue }}</span></div> }
+              </article>
+            }
+            @if (!basicOnly() && dewormings().data) {
+              <article class="card card--flush">
+                <div class="card__head"><h2>Prevención</h2><button type="button" class="link" (click)="select('deworming')">Ver desparasitación</button></div>
+                @for (r of dewormingRows(); track r.kind) {
+                  <div class="kv">
+                    <div><strong>Desparasitación {{ r.name.toLowerCase() }}</strong><small>@if (r.registered) { Última: {{ day(r.lastApplicationDate) }}@if (r.nextDoseDate) { · próxima {{ inDays(r.nextDoseDate) }} } } @else { Sin dosis registrada }</small></div>
+                    <span class="chip" [ngClass]="'chip--' + r.state.tone"><i></i>{{ r.state.label }}</span>
+                  </div>
+                }
+              </article>
+            }
+            @if (!basicOnly()) {
+              @if (weightSummary(); as w) {
+                <article class="card card--flush">
+                  <div class="card__head"><h2>Peso</h2><button type="button" class="link" (click)="select('weight')">Ver historial</button></div>
+                  <div class="weightbox">
+                    <p><strong>{{ w.last.weight }} {{ w.last.unit }}</strong>@if (w.diff !== null) { <span>{{ signed(w.diff) }} {{ w.last.unit }} desde el primer registro</span> }</p>
+                    @if (chart(); as c) {
+                      <svg class="spark" [attr.viewBox]="'0 0 ' + c.W + ' 70'" preserveAspectRatio="none" aria-hidden="true">
+                        <path [attr.d]="c.path" transform="scale(1 0.24)" vector-effect="non-scaling-stroke" />
+                      </svg>
+                    }
+                  </div>
+                </article>
+              }
+              @if (sources().length) {
+                <article class="card card--flush">
+                  <div class="card__head"><h2>De dónde viene la historia</h2></div>
+                  @for (s of sources(); track s.label) {
+                    <div class="kv"><span class="src" [ngClass]="'src--' + s.origin">{{ s.label }}</span><b>{{ s.n }} {{ s.n === 1 ? 'registro' : 'registros' }}</b></div>
+                  }
+                  <p class="foot">La historia es del dueño: viaja con la mascota entre clínicas. Él puede quitar el acceso cuando quiera.</p>
+                </article>
+              }
+            }
+          </div>
+        </div>
       }
     }
 
+    <!-- ───────── Consultas (1998:225) -->
     @case ('visits') {
       @if (visits().loading) { <p class="state" role="status">Cargando consultas…</p> }
       @else if (visits().error; as e) { <p class="state" role="alert">{{ e }}</p> }
       @else {
-        @for (v of sortedVisits(); track v.id) {
-          <article class="card">
-            <div class="top"><h2>{{ v.reason || 'Consulta' }}</h2><span class="muted">{{ day(v.date) }}</span></div>
-            <p class="muted">{{ v.veterinarian }}@if (v.veterinaryName) { · {{ v.veterinaryName }} }</p>
-            <div class="vitals">
-              @if (v.weight !== null) { <span>Peso <b>{{ v.weight }} kg</b></span> }
-              @if (v.temperature !== null) { <span>Temp. <b>{{ v.temperature }} °C</b></span> }
-              @if (v.heartRate !== null) { <span>F. cardíaca <b>{{ v.heartRate }}</b></span> }
-              @if (v.respiratoryRate !== null) { <span>F. resp. <b>{{ v.respiratoryRate }}</b></span> }
-              @if (v.mucousMembranes) { <span>Mucosas <b>{{ v.mucousMembranes }}</b></span> }
-              @if (v.bodyConditionScore !== null) { <span>Condición <b>{{ v.bodyConditionScore }}/9</b></span> }
+        <div class="split">
+          <article class="card card--flush list">
+            <div class="card__head">
+              <h2>Consultas</h2>
+              <div class="seg" role="group" aria-label="Origen">
+                <button type="button" [class.on]="visitScope() === 'all'" (click)="visitScope.set('all')">Todas</button>
+                <button type="button" [class.on]="visitScope() === 'clinic'" (click)="visitScope.set('clinic')">Esta clínica</button>
+              </div>
             </div>
-            @if (v.anamnesis) { <p><b>Anamnesis.</b> {{ v.anamnesis }}</p> }
-            @if (v.physicalExam) { <p><b>Examen físico.</b> {{ v.physicalExam }}</p> }
-            @if (v.diagnosis) { <p><b>Diagnóstico.</b> {{ v.diagnosis }}</p> }
-            @if (v.plan) { <p><b>Plan.</b> {{ v.plan }}</p> }
-            @if (v.notes) { <p class="muted">{{ v.notes }}</p> }
+            @for (v of shownVisits(); track v.id) {
+              <button type="button" class="li" [class.on]="selectedVisit().id === v.id" (click)="selectedVisitId.set(v.id)">
+                <small>{{ day(v.date) }}</small>
+                <strong>{{ v.reason || 'Consulta' }}</strong>
+                <span class="li__meta">
+                  <span>{{ v.veterinarian }}</span>
+                  @if (visitOrigin(v); as o) { <span class="src" [ngClass]="'src--' + o">{{ originLabel(o, v.veterinaryName) }}</span> }
+                </span>
+              </button>
+            } @empty { <p class="empty">Todavía no hay consultas.</p> }
           </article>
-        } @empty { <p class="state">Todavía no hay consultas.</p> }
+
+          @if (selectedVisit(); as v) {
+            <article class="card card--flush detail">
+              <div class="detail__head">
+                <div>
+                  <h2>{{ v.reason || 'Consulta' }}</h2>
+                  <p>{{ longDay(v.date) }}</p>
+                </div>
+                @if (visitOrigin(v); as o) { <span class="src" [ngClass]="'src--' + o">{{ originLabel(o, v.veterinaryName) }}</span> }
+              </div>
+              @if (v.veterinarian) {
+                <div class="by">
+                  <span class="by__av">{{ initials(v.veterinarian) }}</span>
+                  <div><strong>{{ v.veterinarian }}</strong><small>{{ v.veterinaryName }}</small></div>
+                </div>
+              }
+              @if (v.weight !== null || v.temperature !== null || v.heartRate !== null || v.respiratoryRate !== null || v.mucousMembranes || v.bodyConditionScore !== null) {
+                <div class="block">
+                  <small class="lbl">SIGNOS VITALES</small>
+                  <div class="vitals">
+                    @if (v.weight !== null) { <div><span>Peso</span><b>{{ v.weight }} kg</b></div> }
+                    @if (v.temperature !== null) { <div><span>Temperatura</span><b>{{ v.temperature }} °C</b><em [class.warn]="vitalLabel('temp', v.temperature) !== 'Normal'">{{ vitalLabel('temp', v.temperature) }}</em></div> }
+                    @if (v.heartRate !== null) { <div><span>Frec. cardíaca</span><b>{{ v.heartRate }} lpm</b><em [class.warn]="vitalLabel('hr', v.heartRate) !== 'Normal'">{{ vitalLabel('hr', v.heartRate) }}</em></div> }
+                    @if (v.respiratoryRate !== null) { <div><span>Frec. respiratoria</span><b>{{ v.respiratoryRate }} rpm</b><em [class.warn]="vitalLabel('rr', v.respiratoryRate) !== 'Normal'">{{ vitalLabel('rr', v.respiratoryRate) }}</em></div> }
+                    @if (v.mucousMembranes) { <div><span>Mucosas</span><b>{{ v.mucousMembranes }}</b></div> }
+                    @if (v.bodyConditionScore !== null) { <div><span>Cond. corporal</span><b>{{ v.bodyConditionScore }} / 9</b></div> }
+                  </div>
+                </div>
+              }
+              @if (v.reason) { <div class="block"><small class="lbl">MOTIVO DE CONSULTA</small><p>{{ v.reason }}</p></div> }
+              @if (v.anamnesis) { <div class="block"><small class="lbl">ANAMNESIS</small><p>{{ v.anamnesis }}</p></div> }
+              @if (v.physicalExam) { <div class="block"><small class="lbl">EXAMEN FÍSICO</small><p>{{ v.physicalExam }}</p></div> }
+              @if (v.diagnosis) { <div class="block"><small class="lbl">DIAGNÓSTICO</small><p>{{ v.diagnosis }}</p></div> }
+              @if (v.plan) { <div class="block"><small class="lbl">PLAN</small><p>{{ v.plan }}</p></div> }
+              @if (v.notes) { <div class="block"><small class="lbl">NOTAS</small><p>{{ v.notes }}</p></div> }
+              @if (relatedToVisit().length) {
+                <div class="block">
+                  <small class="lbl">RELACIONADOS</small>
+                  <div class="rel">
+                    @for (r of relatedToVisit(); track r.label) {
+                      <span class="rel__i">{{ r.label }}<span class="chip" [ngClass]="'chip--' + r.tone">{{ r.chip }}</span></span>
+                    }
+                  </div>
+                </div>
+              }
+            </article>
+          }
+        </div>
       }
     }
 
+    <!-- ───────── Vacunas (1998:710) -->
     @case ('vaccines') {
       @if (vaccines().loading) { <p class="state" role="status">Cargando el carnet…</p> }
       @else if (vaccines().error; as e) { <p class="state" role="alert">{{ e }}</p> }
       @else {
-        @for (v of sortedVaccines(); track v.id) {
-          <article class="card">
-            <div class="top"><h2>{{ v.name }}</h2><span class="chip" [ngClass]="'chip--' + vaccineState(v).tone">{{ vaccineState(v).label }}</span></div>
-            <dl>
-              <dt>Aplicada</dt><dd>{{ day(v.applicationDate) }}</dd>
-              @if (v.nextDoseDate) { <dt>Próxima dosis</dt><dd>{{ day(v.nextDoseDate) }}</dd> }
-              @if (v.lotNumber) { <dt>Lote</dt><dd>{{ v.lotNumber }}</dd> }
-              @if (v.manufacturer) { <dt>Laboratorio</dt><dd>{{ v.manufacturer }}</dd> }
-              @if (v.veterinarian) { <dt>Aplicó</dt><dd>{{ v.veterinarian }}</dd> }
-            </dl>
-            @if (v.notes) { <p class="muted">{{ v.notes }}</p> }
+        <div class="toolbar">
+          <div class="chips">
+            <span class="chip chip--ok">{{ vaccineCounts().valid }} vigente{{ vaccineCounts().valid === 1 ? '' : 's' }}</span>
+            <span class="chip chip--warn">{{ vaccineCounts().dueSoon }} por vencer</span>
+            <span class="chip chip--bad">{{ vaccineCounts().overdue }} vencida{{ vaccineCounts().overdue === 1 ? '' : 's' }}</span>
+          </div>
+          <span class="grow"></span>
+          @if (canNursing()) { <button type="button" class="vet-btn vet-btn--primary" (click)="add('vaccine')"><vet-icon name="plus" [size]="16" />Aplicar vacuna</button> }
+        </div>
+        <article class="card card--flush">
+          <div class="card__head"><h2>Carnet de vacunas</h2><span class="muted">Lote y laboratorio se guardan en cada dosis</span></div>
+          <div class="scroll">
+            <table class="grid">
+              <thead><tr><th>Vacuna</th><th>Aplicada</th><th>Lote</th><th>Laboratorio</th><th>Aplicó</th><th>Próxima dosis</th><th>Estado</th></tr></thead>
+              <tbody>
+                @for (v of vaccineRows(); track v.id) {
+                  <tr [class.dim]="v.old">
+                    <td class="b">{{ v.name }}</td>
+                    <td>{{ day(v.applicationDate) }}</td>
+                    <td class="b">{{ v.lotNumber || '—' }}</td>
+                    <td>{{ v.manufacturer || '—' }}</td>
+                    <td>{{ v.veterinarian || 'Sin dato' }}</td>
+                    <td [class.red]="v.state.tone === 'bad'" [class.b]="!v.old">{{ v.old ? 'Reemplazada' : day(v.nextDoseDate) || '—' }}</td>
+                    <td><span class="chip" [ngClass]="'chip--' + v.state.tone"><i></i>{{ v.state.label }}</span></td>
+                  </tr>
+                } @empty { <tr><td colspan="7" class="empty">Todavía no hay vacunas en el carnet.</td></tr> }
+              </tbody>
+            </table>
+          </div>
+        </article>
+        <div class="two">
+          <article class="card card--flush">
+            <div class="card__head"><h2>Próximas dosis</h2></div>
+            @for (v of upcomingVaccines(); track v.id) {
+              <div class="kv"><div><strong>{{ v.name }}</strong><small>{{ day(v.nextDoseDate) }}</small></div><b>{{ inDays(v.nextDoseDate) }}</b></div>
+            } @empty { <p class="empty">No hay dosis programadas.</p> }
+            <p class="foot">El dueño recibe un recordatorio automático antes de cada próxima dosis.</p>
           </article>
-        } @empty { <p class="state">Todavía no hay vacunas en el carnet.</p> }
+          <article class="card card--flush">
+            <div class="card__head"><h2>Vencidas</h2>@if (overdueVaccines().length) { <span class="chip chip--bad">{{ overdueVaccines().length }}</span> }</div>
+            @for (v of overdueVaccines(); track v.id) {
+              <div class="kv">
+                <div><strong>{{ v.name }}</strong><small class="red">Venció el {{ day(v.nextDoseDate) }} · {{ inDays(v.nextDoseDate) }}</small></div>
+                @if (canNursing()) { <button type="button" class="vet-btn vet-btn--secondary vet-btn--sm" (click)="add('vaccine')">Aplicar hoy</button> }
+              </div>
+            } @empty { <p class="empty">No hay vacunas vencidas.</p> }
+          </article>
+        </div>
       }
     }
 
+    <!-- ───────── Tratamientos (2001:225) -->
+    @case ('treatments') {
+      @if (visits().loading || treatments().loading) { <p class="state" role="status">Cargando tratamientos…</p> }
+      @else if (treatments().error; as e) { <p class="state" role="alert">{{ e }}</p> }
+      @else {
+        <div class="cols">
+          <div class="stack">
+            <div class="toolbar">
+              <h2 class="h2">Activos <span class="count">{{ activeTreatments().length }}</span></h2>
+              <span class="grow"></span>
+              @if (canWriteClinical() && hasVisits()) { <button type="button" class="vet-btn vet-btn--primary" (click)="add('treatment')"><vet-icon name="plus" [size]="16" />Nuevo tratamiento</button> }
+            </div>
+            @for (t of activeTreatments(); track t.id) {
+              <article class="card card--flush">
+                <div class="tr__head">
+                  <div>
+                    <h3>{{ t.description || 'Tratamiento' }} <span class="chip chip--ok">Activo</span></h3>
+                    <p>{{ day(t.startDate) }}@if (t.endDate) { – {{ day(t.endDate) }} }@if (t.protocol) { · {{ t.protocol }} }</p>
+                  </div>
+                </div>
+                @if (progress(t); as pr) {
+                  <div class="prog"><span class="prog__bar"><i [style.width.%]="pr.pct"></i></span><b>{{ pr.label }}</b></div>
+                }
+                @if (t.medications.length) {
+                  <table class="grid grid--tint">
+                    <thead><tr><th>Medicamento</th><th>Dosis</th><th>Frecuencia</th><th>Duración</th></tr></thead>
+                    <tbody>@for (m of t.medications; track $index) { <tr><td class="b">{{ m.name }}</td><td>{{ m.dosage }}</td><td class="b">{{ m.frequency }}</td><td>{{ m.duration }}</td></tr> }</tbody>
+                  </table>
+                }
+                @if (t.instructions || t.notes) { <p class="foot">Indicaciones: {{ t.instructions || t.notes }}</p> }
+                @if (canWriteClinical()) {
+                  <div class="actions"><button type="button" class="vet-btn vet-btn--secondary vet-btn--sm" (click)="add('medication', t.id)">Agregar medicamento</button></div>
+                }
+              </article>
+            } @empty { <p class="empty card">No hay tratamientos activos.</p> }
+
+            @if (finishedTreatments().length) {
+              <article class="card card--flush">
+                <div class="card__head"><h2>Finalizados <span class="count">{{ finishedTreatments().length }}</span></h2></div>
+                @for (t of finishedTreatments(); track t.id) {
+                  <div class="li li--static">
+                    <strong>{{ t.description || 'Tratamiento' }} <span class="chip chip--mute">{{ t.status || 'Finalizado' }}</span></strong>
+                    <span>{{ medsLine(t) }}</span>
+                    <small>{{ day(t.startDate) }}@if (t.endDate) { – {{ day(t.endDate) }} }</small>
+                  </div>
+                }
+              </article>
+            }
+          </div>
+
+          <div class="side">
+            @if (summary().data?.allergies?.length) {
+              <article class="alert">
+                <small>ANTES DE RECETAR</small>
+                @for (a of summary().data!.allergies; track a) { <p><b>Alergia a {{ a }}</b></p> }
+              </article>
+            }
+            <article class="card card--flush">
+              <div class="card__head"><h2>Historial de medicamentos</h2></div>
+              @for (m of medicationHistory(); track $index) {
+                <div class="kv" [class.kv--bad]="m.status.toUpperCase() === 'REACCION'">
+                  <div><strong>{{ m.name }}</strong><small>@if (m.status.toUpperCase() === 'REACCION') { {{ m.reactionNote || 'Reacción registrada' }} } @else { Desde {{ short(m.since) }} }</small></div>
+                  <span class="chip" [ngClass]="'chip--' + medTone(m.status)">{{ medLabel(m.status) }}</span>
+                </div>
+              } @empty { <p class="empty">Sin medicamentos registrados.</p> }
+            </article>
+          </div>
+        </div>
+      }
+    }
+
+    <!-- ───────── Cirugías (2001:747) -->
+    @case ('surgeries') {
+      @if (surgeries().loading) { <p class="state" role="status">Cargando cirugías…</p> }
+      @else if (surgeries().error; as e) { <p class="state" role="alert">{{ e }}</p> }
+      @else {
+        @if (canWriteClinical() && hasVisits()) {
+          <div class="toolbar"><span class="grow"></span><button type="button" class="vet-btn vet-btn--primary" (click)="add('surgery')"><vet-icon name="plus" [size]="16" />Programar cirugía</button></div>
+        }
+        @if (selectedSurgery(); as s) {
+          <div class="cols">
+            <article class="card card--flush">
+              <div class="detail__head">
+                <div>
+                  <h2>{{ s.title }}</h2>
+                  <p>{{ longDay(s.startsAt || s.surgeryDate) }}</p>
+                  <div class="chips">
+                    @if (s.status) { <span class="chip chip--ok"><i></i>{{ s.status }}</span> }
+                    @if (s.outcome) { <span class="chip chip--ok"><i></i>Resultado: {{ s.outcome }}</span> }
+                    <span class="src src--clinic">{{ ownClinicName() }}</span>
+                  </div>
+                </div>
+                @if (canWriteClinical()) { <button type="button" class="vet-btn vet-btn--secondary vet-btn--sm" (click)="add('surgeryStatus', s.id)">Cambiar estado</button> }
+              </div>
+              <dl class="dl">
+                @if (s.veterinarian) { <dt>Cirujano</dt><dd>{{ s.veterinarian }}</dd> }
+                @if (s.durationMinutes !== null) { <dt>Duración</dt><dd>{{ s.durationMinutes }} minutos</dd> }
+                @if (s.anesthesiaUsed) { <dt>Anestesia</dt><dd>{{ s.anesthesiaUsed }}</dd> }
+                @if (s.asaRisk !== null) { <dt>Riesgo anestésico</dt><dd>ASA {{ s.asaRisk }}</dd> }
+              </dl>
+              @if (s.description) { <div class="block"><small class="lbl">DESCRIPCIÓN</small><p>{{ s.description }}</p></div> }
+              @if (s.postOpInstructions) {
+                <div class="block">
+                  <small class="lbl">INSTRUCCIONES POSOPERATORIAS</small>
+                  <ul class="steps">@for (st of steps(s.postOpInstructions); track $index) { <li>{{ st }}</li> }</ul>
+                </div>
+              }
+              <p class="foot">Solo {{ ownClinicName() }} puede editar o borrar esta cirugía. Cada cambio queda registrado.</p>
+            </article>
+            <div class="side">
+              <article class="card card--flush">
+                <div class="card__head"><h2>Cirugías</h2></div>
+                @for (x of sortedSurgeries(); track x.id) {
+                  <button type="button" class="li" [class.on]="selectedSurgery().id === x.id" (click)="selectedSurgeryId.set(x.id)">
+                    <strong>{{ x.title }}</strong><small>{{ day(x.surgeryDate) }}@if (x.status) { · {{ x.status }} }</small>
+                  </button>
+                }
+              </article>
+              <article class="card card--flush">
+                <div class="card__head"><h2>Documentos</h2></div>
+                <p class="empty">Los documentos de la cirugía estarán disponibles pronto.</p>
+              </article>
+            </div>
+          </div>
+        } @else { <p class="state">Todavía no hay cirugías.</p> }
+      }
+    }
+
+    <!-- ───────── Laboratorio (2002:225) -->
+    @case ('labs') {
+      @if (visits().loading || labs().loading) { <p class="state" role="status">Cargando laboratorio…</p> }
+      @else if (labs().error; as e) { <p class="state" role="alert">{{ e }}</p> }
+      @else {
+        <div class="split">
+          <article class="card card--flush list">
+            <div class="card__head">
+              <h2>Exámenes</h2>
+              @if (canWriteClinical() && hasVisits()) { <button type="button" class="link" (click)="add('lab')">+ Agregar</button> }
+            </div>
+            @for (l of sortedLabs(); track l.id) {
+              <button type="button" class="li" [class.on]="selectedLab().id === l.id" (click)="selectedLabId.set(l.id)">
+                <small>{{ day(l.date) }}</small>
+                <strong>{{ l.name }}</strong>
+                @if (l.results.length) { <span class="li__sub">{{ l.results.length }} parámetros</span> }
+                <span class="li__meta"><span class="chip" [ngClass]="'chip--' + labTone(l).tone"><i></i>{{ labTone(l).label }}</span></span>
+              </button>
+            } @empty { <p class="empty">No hay laboratorios registrados en las consultas.</p> }
+          </article>
+
+          @if (selectedLab(); as l) {
+            <article class="card card--flush detail">
+              <div class="detail__head">
+                <div>
+                  <h2>{{ l.name }}</h2>
+                  <p>{{ longDay(l.date) }}@if (l.laboratoryName) { · {{ l.laboratoryName }} }</p>
+                  <div class="chips"><span class="chip" [ngClass]="'chip--' + labTone(l).tone"><i></i>{{ labTone(l).label }}</span><span class="src src--clinic">{{ ownClinicName() }}</span></div>
+                </div>
+              </div>
+              @if (l.results.length) {
+                <table class="grid grid--tint">
+                  <thead><tr><th>Parámetro</th><th>Resultado</th><th>Rango normal</th><th>Estado</th></tr></thead>
+                  <tbody>
+                    @for (p of l.results; track $index) {
+                      <tr [class.hot]="flagLabel(p.flag).tone === 'warn'">
+                        <td class="b">{{ p.parameter }}</td>
+                        <td class="b" [class.amber]="flagLabel(p.flag).tone === 'warn'">{{ p.result }} {{ p.unit }}</td>
+                        <td>{{ p.reference }}</td>
+                        <td><span class="chip" [ngClass]="'chip--' + flagLabel(p.flag).tone">{{ flagLabel(p.flag).label }}</span></td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              } @else {
+                <dl class="dl">
+                  <dt>Resultado</dt><dd>{{ l.result }}</dd>
+                  @if (l.normalRange) { <dt>Rango normal</dt><dd>{{ l.normalRange }}</dd> }
+                </dl>
+              }
+              @if (l.interpretation) {
+                <div class="block"><small class="lbl">INTERPRETACIÓN{{ l.veterinarian ? ' · ' + (l.veterinarian | uppercase) : '' }}</small><p>{{ l.interpretation }}</p></div>
+              }
+              @if (l.notes) { <div class="block"><small class="lbl">NOTAS</small><p>{{ l.notes }}</p></div> }
+            </article>
+          }
+        </div>
+      }
+    }
+
+    <!-- ───────── Peso (2002:719) -->
     @case ('weight') {
       @if (weights().loading) { <p class="state" role="status">Cargando el peso…</p> }
       @else if (weights().error; as e) { <p class="state" role="alert">{{ e }}</p> }
       @else {
-        @for (w of weightRows(); track w.id) {
-          <div class="item" [class.owner]="w.source === 'OWNER'">
-            <span class="date">{{ day(w.date) }}</span>
-            <div>
-              <strong>{{ w.weight }} {{ w.unit }}@if (w.diff !== null) { <em [class.up]="w.diff > 0" [class.down]="w.diff < 0"> {{ signed(w.diff) }}</em> }</strong>
-              <small>{{ w.source === 'OWNER' ? 'Dueño · desde la app' : 'Clínica' }}@if (w.note) { · {{ w.note }} }</small>
+        <div class="toolbar">
+          @if (weightSummary(); as w) {
+            <p class="wline"><strong>{{ w.last.weight }} {{ w.last.unit }}</strong>@if (w.diff !== null) { <span>{{ signed(w.diff) }} {{ w.last.unit }} desde {{ short(w.first.date) }}@if (w.pct !== null) { ({{ signed(w.pct) }} %) }</span> }</p>
+          }
+          <span class="grow"></span>
+          @if (canNursing()) { <button type="button" class="vet-btn vet-btn--primary" (click)="add('weight')"><vet-icon name="plus" [size]="16" />Registrar peso</button> }
+        </div>
+
+        <article class="card card--flush">
+          <div class="card__head">
+            <h2>Evolución del peso</h2>
+            <div class="legend"><span><i class="dot"></i>Clínica</span><span><i class="dot dot--hollow"></i>Dueño (desde la app)</span></div>
+            <div class="seg" role="group" aria-label="Rango">
+              @for (r of weightRanges; track r.value) { <button type="button" [class.on]="weightRange() === r.value" (click)="weightRange.set(r.value)">{{ r.label }}</button> }
             </div>
           </div>
-        } @empty { <p class="state">Todavía no hay registros de peso.</p> }
-      }
-    }
+          @if (chart(); as c) {
+            <svg class="chart" [attr.viewBox]="'0 0 ' + c.W + ' ' + c.H" role="img" aria-label="Evolución del peso">
+              @for (g of c.grid; track g.label) {
+                <line [attr.x1]="c.L" [attr.x2]="c.W - c.R" [attr.y1]="g.y" [attr.y2]="g.y" class="gl" />
+                <text [attr.x]="c.L - 10" [attr.y]="g.y + 4" text-anchor="end" class="ax">{{ g.label }}</text>
+              }
+              @for (m of c.months; track $index) { <text [attr.x]="m.x" [attr.y]="c.base + 22" text-anchor="middle" class="ax">{{ m.label }}</text> }
+              <path [attr.d]="c.path" class="ln" />
+              @for (p of c.points; track $index) {
+                <circle [attr.cx]="p.x" [attr.cy]="p.y" r="4.5" [class.pt]="!p.owner" [class.pt--owner]="p.owner"><title>{{ p.label }}</title></circle>
+              }
+              <g [attr.transform]="'translate(' + c.last.x + ' ' + (c.last.y - 30) + ')'">
+                <rect x="-30" y="-14" width="60" height="24" rx="5" class="tip" />
+                <text x="0" y="3" text-anchor="middle" class="tip__t">{{ c.last.label }}</text>
+              </g>
+            </svg>
+          } @else { <p class="empty">Todavía no hay registros de peso.</p> }
+        </article>
 
-    @case ('treatments') {
-      @if (canWriteClinical() && hasVisits()) {
-        <div class="bar"><button type="button" class="vet-btn vet-btn--primary" (click)="add('treatment')">Nuevo tratamiento</button></div>
-      }
-      @if (visits().loading || treatments().loading) { <p class="state" role="status">Cargando tratamientos…</p> }
-      @else if (treatments().error; as e) { <p class="state" role="alert">{{ e }}</p> }
-      @else {
-        @for (t of treatments().data; track t.id) {
-          <article class="card">
-            <div class="top">
-              <h2>{{ t.description || 'Tratamiento' }}</h2>
-              @if (t.status) { <span class="chip" [ngClass]="'chip--' + treatmentTone(t.status)">{{ t.status }}</span> }
-            </div>
-            <p class="muted">{{ day(t.startDate) }}@if (t.endDate) { → {{ day(t.endDate) }} }@if (t.protocol) { · {{ t.protocol }} }</p>
-            @for (m of t.medications; track $index) {
-              <p class="row">{{ m.name }} · {{ m.dosage }} · {{ m.frequency }} · {{ m.duration }}@if (m.status) { <em> · {{ m.status }}</em> }@if (m.reactionNote) { <em> · {{ m.reactionNote }}</em> }</p>
-            }
-            @if (t.instructions) { <p><b>Indicaciones.</b> {{ t.instructions }}</p> }
-            @if (t.notes) { <p class="muted">{{ t.notes }}</p> }
-            @if (canWriteClinical()) {
-              <div class="bar"><button type="button" class="vet-btn vet-btn--secondary" (click)="add('medication', t.id)">Agregar medicamento</button></div>
-            }
-          </article>
-        } @empty { <p class="state">No hay tratamientos registrados en las consultas.</p> }
-      }
-    }
-
-    @case ('surgeries') {
-      @if (canWriteClinical() && hasVisits()) {
-        <div class="bar"><button type="button" class="vet-btn vet-btn--primary" (click)="add('surgery')">Programar cirugía</button></div>
-      }
-      @if (surgeries().loading) { <p class="state" role="status">Cargando cirugías…</p> }
-      @else if (surgeries().error; as e) { <p class="state" role="alert">{{ e }}</p> }
-      @else {
-        @for (s of sortedSurgeries(); track s.id) {
-          <article class="card">
-            <div class="top"><h2>{{ s.title }}</h2><span class="muted">{{ day(s.surgeryDate) }}</span></div>
-            <dl>
-              @if (s.status) { <dt>Estado</dt><dd>{{ s.status }}</dd> }
-              @if (s.outcome) { <dt>Resultado</dt><dd>{{ s.outcome }}</dd> }
-              @if (s.durationMinutes !== null) { <dt>Duración</dt><dd>{{ s.durationMinutes }} min</dd> }
-              @if (s.asaRisk !== null) { <dt>Riesgo ASA</dt><dd>{{ s.asaRisk }}</dd> }
-              @if (s.veterinarian) { <dt>Cirujano</dt><dd>{{ s.veterinarian }}</dd> }
-              @if (s.anesthesiaUsed) { <dt>Anestesia</dt><dd>{{ s.anesthesiaUsed }}</dd> }
-            </dl>
-            @if (s.description) { <p>{{ s.description }}</p> }
-            @if (s.postOpInstructions) { <p class="muted"><b>Posoperatorio.</b> {{ s.postOpInstructions }}</p> }
-            @if (canWriteClinical()) {
-              <div class="bar"><button type="button" class="vet-btn vet-btn--secondary" (click)="add('surgeryStatus', s.id)">Cambiar estado</button></div>
-            }
-          </article>
-        } @empty { <p class="state">Todavía no hay cirugías.</p> }
-      }
-    }
-
-    @case ('labs') {
-      @if (canWriteClinical() && hasVisits()) {
-        <div class="bar"><button type="button" class="vet-btn vet-btn--primary" (click)="add('lab')">Agregar examen</button></div>
-      }
-      @if (visits().loading || labs().loading) { <p class="state" role="status">Cargando laboratorio…</p> }
-      @else if (labs().error; as e) { <p class="state" role="alert">{{ e }}</p> }
-      @else {
-        @for (l of labs().data; track l.id) {
-          <article class="card">
-            <div class="top">
-              <h2>{{ l.name }}</h2>
-              @if (l.status) { <span class="chip" [ngClass]="l.status === 'NORMAL' ? 'chip--ok' : 'chip--bad'">{{ l.status === 'NORMAL' ? 'Normal' : 'Fuera de rango' }}</span> }
-              @else if (l.isNormal !== null) { <span class="chip" [ngClass]="l.isNormal ? 'chip--ok' : 'chip--bad'">{{ l.isNormal ? 'Normal' : 'Fuera de rango' }}</span> }
-            </div>
-            <p class="muted">{{ day(l.date) }}@if (l.laboratoryName) { · {{ l.laboratoryName }} }@if (l.veterinarian) { · {{ l.veterinarian }} }</p>
-            @if (l.results.length) {
-              <table>
-                <thead><tr><th>Parámetro</th><th>Resultado</th><th>Rango normal</th><th></th></tr></thead>
+        <div class="cols">
+          <article class="card card--flush">
+            <div class="card__head"><h2>Registros</h2></div>
+            <div class="scroll">
+              <table class="grid">
+                <thead><tr><th>Fecha</th><th>Peso</th><th>Cambio</th><th>Origen</th></tr></thead>
                 <tbody>
-                  @for (p of l.results; track $index) {
-                    <tr [class.out]="p.flag && p.flag !== 'NORMAL'">
-                      <td>{{ p.parameter }}</td><td>{{ p.result }} {{ p.unit }}</td><td>{{ p.reference }}</td><td>{{ p.flag }}</td>
+                  @for (w of weightRows(); track w.id) {
+                    <tr>
+                      <td>{{ day(w.date) }}</td>
+                      <td class="b">{{ w.weight }} {{ w.unit }}</td>
+                      <td>{{ w.diff !== null ? signed(w.diff) : '—' }}</td>
+                      <td><span class="src" [ngClass]="w.source === 'OWNER' ? 'src--owner' : 'src--clinic'">{{ w.source === 'OWNER' ? 'Dueño · app' : ownClinicName() }}</span>@if (w.note) { <span class="muted"> {{ w.note }}</span> }</td>
                     </tr>
+                  } @empty { <tr><td colspan="4" class="empty">Todavía no hay registros de peso.</td></tr> }
+                </tbody>
+              </table>
+            </div>
+          </article>
+          <div class="side">
+            @if (weightSummary(); as w) {
+              <article class="card card--flush">
+                <div class="card__head"><h2>Resumen</h2></div>
+                <div class="kv"><span>Último registro</span><b>{{ w.last.weight }} {{ w.last.unit }} · {{ short(w.last.date) }}</b></div>
+                @if (w.diff !== null) { <div class="kv"><span>Cambio desde {{ short(w.first.date) }}</span><b>{{ signed(w.diff) }} {{ w.last.unit }}@if (w.pct !== null) { ({{ signed(w.pct) }} %) }</b></div> }
+                <div class="kv"><span>Registros del dueño</span><b>{{ w.owner }} de {{ w.total }}</b></div>
+              </article>
+              <p class="alert alert--soft"><b>Peso registrado por el dueño</b>El dueño puede pesar a la mascota en casa y anotarlo en la app. Esos registros aparecen con borde para distinguirlos de los de la clínica.</p>
+            }
+          </div>
+        </div>
+      }
+    }
+
+    <!-- ───────── Desparasitación: última dosis por tipo (D9/V10) -->
+    @case ('deworming') {
+      @if (dewormings().loading) { <p class="state" role="status">Cargando la desparasitación…</p> }
+      @else if (dewormings().error; as e) { <p class="state" role="alert">{{ e }}</p> }
+      @else {
+        <div class="toolbar">
+          <div class="chips">
+            @for (r of dewormingRows(); track r.kind) { <span class="chip" [ngClass]="'chip--' + r.state.tone"><i></i>{{ r.name }}: {{ r.state.label }}</span> }
+          </div>
+          <span class="grow"></span>
+          @if (canNursing()) { <button type="button" class="vet-btn vet-btn--primary" (click)="add('deworming')"><vet-icon name="plus" [size]="16" />Registrar desparasitación</button> }
+        </div>
+        <div class="two">
+          @for (r of dewormingRows(); track r.kind) {
+            <article class="card card--flush">
+              <div class="card__head"><h2>{{ r.name }} <small class="muted">{{ r.hint }}</small></h2><span class="chip" [ngClass]="'chip--' + r.state.tone"><i></i>{{ r.state.label }}</span></div>
+              @if (r.registered) {
+                <div class="kv"><span>Última dosis</span><b>{{ day(r.lastApplicationDate) }}</b></div>
+                @if (r.product) { <div class="kv"><span>Producto</span><b>{{ r.product }}</b></div> }
+                <div class="kv"><span>Próxima dosis</span><b [class.red]="r.state.tone === 'bad'">{{ r.nextDoseDate ? day(r.nextDoseDate) + ' · ' + inDays(r.nextDoseDate) : 'Sin fecha' }}</b></div>
+              } @else {
+                <p class="empty">Todavía no hay una dosis registrada.</p>
+              }
+              @if (canNursing()) { <div class="kv"><button type="button" class="link" (click)="add('deworming', undefined, { dewormingKind: r.kind })">Registrar dosis {{ r.name.toLowerCase() }}</button></div> }
+            </article>
+          }
+        </div>
+        @if (dewormings().data?.history?.length) {
+          <article class="card card--flush">
+            <div class="card__head"><h2>Dosis anteriores</h2></div>
+            <div class="scroll">
+              <table class="grid">
+                <thead><tr><th>Tipo</th><th>Producto</th><th>Dosis</th><th>Aplicada</th><th>Próxima</th><th>Quién</th></tr></thead>
+                <tbody>
+                  @for (h of dewormings().data!.history; track h.id) {
+                    <tr><td>{{ h.kind === 'INTERNAL' ? 'Interna' : 'Externa' }}</td><td class="b">{{ h.product || '—' }}</td><td>{{ h.dose || '—' }}{{ h.weightKg ? ' · ' + h.weightKg + ' kg' : '' }}</td><td>{{ day(h.applicationDate) }}</td><td>{{ day(h.nextDoseDate) || '—' }}</td><td>{{ h.administeredBy === 'CLINIC' ? 'Clínica' : 'Dueño' }}</td></tr>
                   }
                 </tbody>
               </table>
-            } @else {
-              <dl>
-                <dt>Resultado</dt><dd>{{ l.result }}</dd>
-                @if (l.normalRange) { <dt>Rango normal</dt><dd>{{ l.normalRange }}</dd> }
-              </dl>
-            }
-            @if (l.interpretation) { <p><b>Interpretación.</b> {{ l.interpretation }}</p> }
-            @if (l.notes) { <p class="muted">{{ l.notes }}</p> }
+            </div>
           </article>
-        } @empty { <p class="state">No hay laboratorios registrados en las consultas.</p> }
+        }
+        <p class="note">El dueño recibe un aviso 7 días antes y el día de la dosis. La fecha de la próxima dosis la puedes cambiar al registrar.</p>
       }
+    }
+
+    <!-- ───────── Alergias y esterilización (D9/V10) -->
+    @case ('allergies') {
+      @if (allergies().loading) { <p class="state" role="status">Cargando las alergias…</p> }
+      @else if (allergies().error; as e) { <p class="state" role="alert">{{ e }}</p> }
+      @else {
+        <div class="toolbar">
+          <div class="chips">
+            <span class="chip" [ngClass]="activeAllergies().length ? 'chip--warn' : 'chip--mute'">{{ activeAllergies().length }} vigente{{ activeAllergies().length === 1 ? '' : 's' }}</span>
+            @if (neuteredChip(); as n) { <span class="chip" [ngClass]="'chip--' + n.tone">{{ n.label }}</span> }
+          </div>
+          <span class="grow"></span>
+          @if (canNursing()) { <button type="button" class="vet-btn vet-btn--secondary" (click)="editNeutered()">Confirmar esterilización</button> }
+          @if (canWriteClinical()) { <button type="button" class="vet-btn vet-btn--primary" (click)="add('allergy')"><vet-icon name="plus" [size]="16" />Registrar alergia</button> }
+        </div>
+        @if (allergyNote()) { <p class="note">{{ allergyNote() }}</p> }
+        <article class="card card--flush">
+          <div class="card__head"><h2>Alergias</h2><span class="muted">Declaradas por el dueño o confirmadas por una clínica</span></div>
+          <div class="scroll">
+            <table class="grid">
+              <thead><tr><th>Alérgeno</th><th>Tipo</th><th>Gravedad</th><th>Reacción</th><th>Origen</th><th></th></tr></thead>
+              <tbody>
+                @for (a of activeAllergies(); track a.id) {
+                  <tr>
+                    <td class="b">{{ a.allergen }}</td>
+                    <td>{{ categoryLabel(a.category) }}</td>
+                    <td><span class="chip" [ngClass]="'chip--' + severityChip(a.severity).tone"><i></i>{{ severityChip(a.severity).label }}</span></td>
+                    <td>{{ a.reaction || '—' }}</td>
+                    <td>{{ allergyOrigin(a) }}</td>
+                    <td>@if (a.state === 'SUSPECTED' && a.source !== 'CLINIC' && canWriteClinical()) { <button type="button" class="link" (click)="confirmAllergy(a)">Confirmar</button> }</td>
+                  </tr>
+                } @empty { <tr><td colspan="6" class="empty">No hay alergias vigentes registradas.</td></tr> }
+              </tbody>
+            </table>
+          </div>
+        </article>
+        @if (pastAllergies().length) {
+          <article class="card card--flush">
+            <div class="card__head"><h2>Resueltas</h2></div>
+            @for (a of pastAllergies(); track a.id) { <div class="kv"><span>{{ a.allergen }}</span><span class="chip chip--mute">Resuelta</span></div> }
+          </article>
+        }
+        <p class="note">Solo un veterinario con tarjeta verificada confirma una alergia. Al agregar un medicamento que coincida con una alergia registrada verás un aviso.</p>
+      }
+    }
+
+    <!-- ───────── Documentos (2026:225): GET /documents no está publicado en el gateway -->
+    @case ('documents') {
+      <article class="card">
+        <h2>Documentos</h2>
+        <p class="muted">Los documentos de la historia (resultados, consentimientos, recetas) estarán disponibles cuando el backend publique su consulta.</p>
+      </article>
     }
   }
 </section>

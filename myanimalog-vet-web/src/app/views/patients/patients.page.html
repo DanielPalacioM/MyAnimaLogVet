@@ -115,15 +115,7 @@
         <div>
           <small>DUEÑO</small>
           <strong>{{ p.owner }}</strong>
-          @if (p.phone) {
-            <span class="ss-phone"><vet-icon name="phone" [size]="13" />{{ p.phone }}</span>
-          } @else {
-            <small>El dueño aún no comparte su teléfono con la clínica.</small>
-          }
         </div>
-        @if (p.phone) {
-          <a class="ss-btn" [href]="'tel:' + p.phone.replaceAll(' ', '')"><vet-icon name="phone" [size]="14" />Llamar</a>
-        }
       </div>
       @if (p.inApp) {
         <p class="ss-share" style="margin: 0"><vet-icon name="shield" [size]="14" />Comparte la historia de {{ p.name }} con la clínica</p>

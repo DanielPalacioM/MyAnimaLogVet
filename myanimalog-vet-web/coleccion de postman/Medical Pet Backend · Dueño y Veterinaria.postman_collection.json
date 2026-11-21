@@ -1,13 +1,259 @@
 {
   "info": {
-    "_postman_id": "a50f638c-7fd5-45cd-8ed6-c5933d3821b6",
+    "_postman_id": "2c402014-87a3-4591-9461-1831adb4d6f1",
     "name": "Medical Pet Backend · Dueño y Veterinaria",
     "description": "Colección completa. Carpetas D* = DUEÑO (campos base). Carpetas V* = VETERINARIA (base + extra). Pasos: 1) Arranca el stub (node scripts/dev-auth/stub-services.mjs) y deja la terminal abierta. 2) Arranca Medical (npm run dev) con JWT_JWKS_URI, PETS_SERVICE_URL, VETERINARY_SERVICE_URL e INTERNAL_API_KEY. 3) Pega TOKEN_DUENO, TOKEN_CLINICA y TOKEN_OTRO_DUEÑO de la MISMA salida del stub. 4) Ejecuta las carpetas en orden con el Runner. Los NEGATIVO deben devolver el código indicado.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     "_exporter_id": "44124838",
-    "_collection_link": "https://go.postman.co/collection/44124838-a50f638c-7fd5-45cd-8ed6-c5933d3821b6?source=collection_link"
+    "_collection_link": "https://go.postman.co/collection/44124838-2c402014-87a3-4591-9461-1831adb4d6f1?source=collection_link"
   },
   "item": [
+    {
+      "name": "00 · Autenticación (User service)",
+      "item": [
+        {
+          "name": "POST Login dueño (token normal)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', function () { pm.response.to.have.status(200); });",
+                  "const j = pm.response.json();",
+                  "const access = j.accessToken || j.access_token || j.token;",
+                  "const refresh = j.refreshToken || j.refresh_token;",
+                  "pm.test('recibe access token', function () { pm.expect(access).to.be.a('string'); });",
+                  "if (access) pm.environment.set('tokenOwner', access);",
+                  "if (refresh) pm.environment.set('refresh_token', refresh);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{owner_email}}\",\n  \"password\": \"{{owner_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{user_url}}/auth/local",
+              "host": [
+                "{{user_url}}"
+              ],
+              "path": [
+                "auth",
+                "local"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST Login cuenta de clínica (token base)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', function () { pm.response.to.have.status(200); });",
+                  "const j = pm.response.json();",
+                  "const access = j.accessToken || j.access_token || j.token;",
+                  "const refresh = j.refreshToken || j.refresh_token;",
+                  "pm.test('recibe access token de la clínica', function () { pm.expect(access).to.be.a('string'); });",
+                  "if (access) pm.environment.set('tokenOwnerClinic', access);",
+                  "if (refresh) pm.environment.set('refresh_O_Clinic_token', refresh);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{clinic_owner}}\",\n  \"password\": \"{{clinic_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{user_url}}/auth/local",
+              "host": [
+                "{{user_url}}"
+              ],
+              "path": [
+                "auth",
+                "local"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST Token de clínica (seleccionar clínica)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', function () { pm.response.to.have.status(200); });",
+                  "const j = pm.response.json();",
+                  "const access = j.accessToken || j.access_token || j.token;",
+                  "pm.test('recibe token de clínica', function () { pm.expect(access).to.be.a('string'); });",
+                  "if (access) pm.environment.set('tokenClinic', access);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenOwnerClinic}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{user_url}}/auth/context/veterinary/{{veterinaryId}}",
+              "host": [
+                "{{user_url}}"
+              ],
+              "path": [
+                "auth",
+                "context",
+                "veterinary",
+                "{{veterinaryId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST Refresh del token dueño (rota el refresh token)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', function () { pm.response.to.have.status(200); });",
+                  "const j = pm.response.json();",
+                  "const access = j.accessToken || j.access_token || j.token;",
+                  "const refresh = j.refreshToken || j.refresh_token;",
+                  "if (access) pm.environment.set('tokenOwner', access);",
+                  "if (refresh) pm.environment.set('refresh_token', refresh);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refresh_token}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{user_url}}/auth/refresh",
+              "host": [
+                "{{user_url}}"
+              ],
+              "path": [
+                "auth",
+                "refresh"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET Mi usuario (User service)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('trae el usuario', function () { pm.expect(pm.response.json()).to.be.an('object'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenOwner}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{user_url}}/auth/me",
+              "host": [
+                "{{user_url}}"
+              ],
+              "path": [
+                "auth",
+                "me"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
     {
       "name": "D1. Visitas",
       "item": [
@@ -114,7 +360,63 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('status 200', function () { pm.response.to.have.status(200); });"
+                  "pm.test('status 201', function () { pm.response.to.have.status(201); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenOwner}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Corrección de prueba (motivo obligatorio)\",\n  \"diagnosis\": \"Sin novedades\",\n  \"notes\": \"Control realizado en casa\",\n  \"weight\": 12.5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/visits/{{ownerVisitId}}/corrections",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "visits",
+                "{{ownerVisitId}}",
+                "corrections"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "NEGATIVO: PUT antiguo de visita responde 405",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 405', function () { pm.response.to.have.status(405); });",
+                  "pm.test('código USE_CORRECTION_ENDPOINT', function () { pm.expect(pm.response.json().code).to.eql('USE_CORRECTION_ENDPOINT'); });"
                 ]
               }
             }
@@ -139,7 +441,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"diagnosis\": \"Sin novedades\",\n  \"notes\": \"Control realizado en casa\",\n  \"weight\": 12.5\n}",
+              "raw": "{\n  \"weight\": 12.5\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -155,6 +457,53 @@
                 "api",
                 "visits",
                 "{{ownerVisitId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Versiones de la visita (dueño)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('es una lista', function () { pm.expect(pm.response.json()).to.be.an('array'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenOwner}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/visits/{{ownerVisitId}}/corrections",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "visits",
+                "{{ownerVisitId}}",
+                "corrections"
               ]
             }
           },
@@ -361,7 +710,8 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('status 201', function () { pm.response.to.have.status(201); });"
+                  "pm.test('status 201', function () { pm.response.to.have.status(201); });",
+                  "pm.collectionVariables.set('weightRecordId', pm.response.json().id);"
                 ]
               }
             }
@@ -508,7 +858,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('status 200', function () { pm.response.to.have.status(200); });"
+                  "pm.test('status 201', function () { pm.response.to.have.status(201); });"
                 ]
               }
             }
@@ -524,7 +874,7 @@
                 }
               ]
             },
-            "method": "PATCH",
+            "method": "POST",
             "header": [
               {
                 "key": "Content-Type",
@@ -533,7 +883,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"weight\": 12.6,\n  \"note\": \"Corrección\"\n}",
+              "raw": "{\n  \"reason\": \"Corrección de prueba (motivo obligatorio)\",\n  \"weight\": 12.6,\n  \"note\": \"Corrección\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -541,19 +891,15 @@
               }
             },
             "url": {
-              "raw": "{{baseUrl}}/api/weight?petId={{petMax}}",
+              "raw": "{{baseUrl}}/api/weight/{{weightRecordId}}/corrections",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
-                "weight"
-              ],
-              "query": [
-                {
-                  "key": "petId",
-                  "value": "{{petMax}}"
-                }
+                "weight",
+                "{{weightRecordId}}",
+                "corrections"
               ]
             }
           },
@@ -765,7 +1111,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('status 200', function () { pm.response.to.have.status(200); });"
+                  "pm.test('status 201', function () { pm.response.to.have.status(201); });"
                 ]
               }
             }
@@ -781,7 +1127,7 @@
                 }
               ]
             },
-            "method": "PUT",
+            "method": "POST",
             "header": [
               {
                 "key": "Content-Type",
@@ -790,7 +1136,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Antirrábica refuerzo\",\n  \"notes\": \"Sin reacciones\"\n}",
+              "raw": "{\n  \"reason\": \"Corrección de prueba (motivo obligatorio)\",\n  \"name\": \"Antirrábica refuerzo\",\n  \"notes\": \"Sin reacciones\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -798,14 +1144,71 @@
               }
             },
             "url": {
-              "raw": "{{baseUrl}}/api/vaccines/{{ownerVaccineId}}",
+              "raw": "{{baseUrl}}/api/vaccines/{{ownerVaccineId}}/corrections",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
                 "vaccines",
-                "{{ownerVaccineId}}"
+                "{{ownerVaccineId}}",
+                "corrections"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "NEGATIVO: corrección sin motivo (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', function () { pm.response.to.have.status(400); });",
+                  "pm.test('código REASON_REQUIRED', function () { pm.expect(pm.response.json().code).to.eql('REASON_REQUIRED'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenOwner}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"notes\": \"sin motivo\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/vaccines/{{ownerVaccineId}}/corrections",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "vaccines",
+                "{{ownerVaccineId}}",
+                "corrections"
               ]
             }
           },
@@ -1000,7 +1403,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('status 200', function () { pm.response.to.have.status(200); });"
+                  "pm.test('status 201', function () { pm.response.to.have.status(201); });"
                 ]
               }
             }
@@ -1016,7 +1419,7 @@
                 }
               ]
             },
-            "method": "PUT",
+            "method": "POST",
             "header": [
               {
                 "key": "Content-Type",
@@ -1025,7 +1428,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"notes\": \"Evolución favorable\"\n}",
+              "raw": "{\n  \"reason\": \"Corrección de prueba (motivo obligatorio)\",\n  \"notes\": \"Evolución favorable\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1033,14 +1436,15 @@
               }
             },
             "url": {
-              "raw": "{{baseUrl}}/api/treatments/{{ownerTreatmentId}}",
+              "raw": "{{baseUrl}}/api/treatments/{{ownerTreatmentId}}/corrections",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
                 "treatments",
-                "{{ownerTreatmentId}}"
+                "{{ownerTreatmentId}}",
+                "corrections"
               ]
             }
           },
@@ -1150,7 +1554,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('status 200', function () { pm.response.to.have.status(200); });"
+                  "pm.test('status 201', function () { pm.response.to.have.status(201); });"
                 ]
               }
             }
@@ -1166,7 +1570,7 @@
                 }
               ]
             },
-            "method": "PUT",
+            "method": "POST",
             "header": [
               {
                 "key": "Content-Type",
@@ -1175,7 +1579,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"dosage\": \"Todo el cuerpo, 15 min\",\n  \"frequency\": \"3 veces por semana\"\n}",
+              "raw": "{\n  \"reason\": \"Corrección de prueba (motivo obligatorio)\",\n  \"dosage\": \"Todo el cuerpo, 15 min\",\n  \"frequency\": \"3 veces por semana\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1183,14 +1587,15 @@
               }
             },
             "url": {
-              "raw": "{{baseUrl}}/api/medications/{{ownerMedicationId}}",
+              "raw": "{{baseUrl}}/api/medications/{{ownerMedicationId}}/corrections",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
                 "medications",
-                "{{ownerMedicationId}}"
+                "{{ownerMedicationId}}",
+                "corrections"
               ]
             }
           },
@@ -1386,7 +1791,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('status 200', function () { pm.response.to.have.status(200); });"
+                  "pm.test('status 201', function () { pm.response.to.have.status(201); });"
                 ]
               }
             }
@@ -1402,7 +1807,7 @@
                 }
               ]
             },
-            "method": "PUT",
+            "method": "POST",
             "header": [
               {
                 "key": "Content-Type",
@@ -1411,7 +1816,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"postOpInstructions\": \"Reposo 7 días\"\n}",
+              "raw": "{\n  \"reason\": \"Corrección de prueba (motivo obligatorio)\",\n  \"postOpInstructions\": \"Reposo 7 días\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1419,21 +1824,22 @@
               }
             },
             "url": {
-              "raw": "{{baseUrl}}/api/surgery/{{ownerSurgeryId}}",
+              "raw": "{{baseUrl}}/api/surgery/{{ownerSurgeryId}}/corrections",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
                 "surgery",
-                "{{ownerSurgeryId}}"
+                "{{ownerSurgeryId}}",
+                "corrections"
               ]
             }
           },
           "response": []
         },
         {
-          "name": "Cambiar estado (dueño)",
+          "name": "Iniciar cirugía (dueño)",
           "event": [
             {
               "listen": "test",
@@ -1465,7 +1871,61 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"status\": \"IN_PROGRESS\",\n  \"outcome\": \"Sin complicaciones\"\n}",
+              "raw": "{\n  \"status\": \"IN_PROGRESS\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/surgery/{{ownerSurgeryId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "surgery",
+                "{{ownerSurgeryId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Completar cirugía (dueño)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenOwner}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"COMPLETED\",\n  \"outcome\": \"SUCCESSFUL\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1513,14 +1973,14 @@
             "method": "DELETE",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/surgery/72de1c64-d959-4639-bf52-7ec4f063c936",
+              "raw": "{{baseUrl}}/api/surgery/{{ownerSurgeryId}}",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
                 "surgery",
-                "72de1c64-d959-4639-bf52-7ec4f063c936"
+                "{{ownerSurgeryId}}"
               ]
             }
           },
@@ -1610,65 +2070,6 @@
             },
             "method": "GET",
             "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/api/lab?visit_id={{ownerVisitId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "lab"
-              ],
-              "query": [
-                {
-                  "key": "visit_id",
-                  "value": "{{ownerVisitId}}"
-                }
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Actualizar resultado (dueño, base)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('status 200', function () { pm.response.to.have.status(200); });"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{tokenOwner}}",
-                  "type": "string"
-                }
-              ]
-            },
-            "method": "PATCH",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"result\": \"Normal\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            },
             "url": {
               "raw": "{{baseUrl}}/api/lab?visit_id={{ownerVisitId}}",
               "host": [
@@ -1852,6 +2253,900 @@
       ]
     },
     {
+      "name": "D9. Datos clínicos de la mascota (dueño)",
+      "item": [
+        {
+          "name": "Declarar alergia (dueño, queda SUSPECTED)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', function () { pm.response.to.have.status(201); });",
+                  "pm.test('queda SUSPECTED y con origen OWNER', function () { const j = pm.response.json(); pm.expect(j.status).to.eql('SUSPECTED'); });",
+                  "pm.collectionVariables.set('ownerAllergyId', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenOwner}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"petId\": \"{{petMax}}\",\n  \"allergen\": \"Penicilina\",\n  \"category\": \"DRUG\",\n  \"severity\": \"SEVERE\",\n  \"reaction\": \"Urticaria\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/allergies",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "allergies"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Alergias y estado general (dueño)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('trae la lista y el estado', function () { const j = pm.response.json(); pm.expect(j.allergies).to.be.an('array'); pm.expect(j.allergyStatus).to.be.oneOf(['UNKNOWN','NONE_KNOWN','HAS_ALLERGIES']); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenOwner}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/allergies?petId={{petMax}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "allergies"
+              ],
+              "query": [
+                {
+                  "key": "petId",
+                  "value": "{{petMax}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "NEGATIVO: dueño declara \"sin alergias\" con una alergia vigente (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 409', function () { pm.response.to.have.status(409); });",
+                  "pm.test('código ACTIVE_ALLERGIES_EXIST', function () { pm.expect(pm.response.json().code).to.eql('ACTIVE_ALLERGIES_EXIST'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenOwner}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"allergyStatus\": \"NONE_KNOWN\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/pets/{{petMax}}/clinical-profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "pets",
+                "{{petMax}}",
+                "clinical-profile"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "NEGATIVO: dueño confirma su propia alergia (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 403', function () { pm.response.to.have.status(403); });",
+                  "pm.test('código OWNER_CANNOT_CONFIRM', function () { pm.expect(pm.response.json().code).to.eql('OWNER_CANNOT_CONFIRM'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenOwner}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/allergies/{{ownerAllergyId}}/confirm",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "allergies",
+                "{{ownerAllergyId}}",
+                "confirm"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Corregir alergia con motivo (dueño)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', function () { pm.response.to.have.status(201); });",
+                  "pm.test('devuelve la versión', function () { pm.expect(pm.response.json().version).to.be.a('number'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenOwner}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Corrección de prueba (motivo obligatorio)\",\n  \"reaction\": \"Edema facial\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/allergies/{{ownerAllergyId}}/corrections",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "allergies",
+                "{{ownerAllergyId}}",
+                "corrections"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "NEGATIVO: corrección sin motivo (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', function () { pm.response.to.have.status(400); });",
+                  "pm.test('código REASON_REQUIRED', function () { pm.expect(pm.response.json().code).to.eql('REASON_REQUIRED'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenOwner}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reaction\": \"sin motivo\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/allergies/{{ownerAllergyId}}/corrections",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "allergies",
+                "{{ownerAllergyId}}",
+                "corrections"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "NEGATIVO: corrección que pone CONFIRMED (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 403', function () { pm.response.to.have.status(403); });",
+                  "pm.test('código USE_CONFIRM_ENDPOINT', function () { pm.expect(pm.response.json().code).to.eql('USE_CONFIRM_ENDPOINT'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenOwner}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Intento del dueño\",\n  \"status\": \"CONFIRMED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/allergies/{{ownerAllergyId}}/corrections",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "allergies",
+                "{{ownerAllergyId}}",
+                "corrections"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Versiones de la alergia (dueño)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('es una lista', function () { pm.expect(pm.response.json()).to.be.an('array'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenOwner}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/allergies/{{ownerAllergyId}}/corrections",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "allergies",
+                "{{ownerAllergyId}}",
+                "corrections"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "NEGATIVO: otro dueño sin acceso a la mascota (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 403', function () { pm.response.to.have.status(403); });",
+                  "pm.test('código PET_NOT_OWNED', function () { pm.expect(pm.response.json().code).to.eql('PET_NOT_OWNED'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenOtherOwner}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/allergies?petId={{petMax}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "allergies"
+              ],
+              "query": [
+                {
+                  "key": "petId",
+                  "value": "{{petMax}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Esterilización declarada por el dueño",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('queda con origen OWNER', function () { pm.expect(pm.response.json().neutered.source).to.eql('OWNER'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenOwner}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"neuteredStatus\": \"YES\",\n  \"neuteredAt\": \"2024-03-01\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/pets/{{petMax}}/clinical-profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "pets",
+                "{{petMax}}",
+                "clinical-profile"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "NEGATIVO: esterilización con fecha futura (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', function () { pm.response.to.have.status(400); });",
+                  "pm.test('código VALIDATION_ERROR', function () { pm.expect(pm.response.json().code).to.eql('VALIDATION_ERROR'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenOwner}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"neuteredStatus\": \"YES\",\n  \"neuteredAt\": \"2099-01-01\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/pets/{{petMax}}/clinical-profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "pets",
+                "{{petMax}}",
+                "clinical-profile"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "NEGATIVO: esterilización con fecha anterior al nacimiento (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', function () { pm.response.to.have.status(400); });",
+                  "pm.test('código VALIDATION_ERROR', function () { pm.expect(pm.response.json().code).to.eql('VALIDATION_ERROR'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenOwner}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"neuteredStatus\": \"YES\",\n  \"neuteredAt\": \"1990-01-01\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/pets/{{petMax}}/clinical-profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "pets",
+                "{{petMax}}",
+                "clinical-profile"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Registrar última desparasitación interna (dueño)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', function () { pm.response.to.have.status(201); });",
+                  "pm.test('devuelve el id del registro', function () { pm.expect(pm.response.json().id).to.be.a('string'); });",
+                  "pm.collectionVariables.set('ownerDewormingId', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenOwner}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"petId\": \"{{petMax}}\",\n  \"kind\": \"INTERNAL\",\n  \"product\": \"Drontal\",\n  \"dose\": \"1 tableta\",\n  \"weightKg\": 4.2,\n  \"applicationDate\": \"2026-10-01\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/dewormings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "dewormings"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "NEGATIVO: desparasitación con fecha futura (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', function () { pm.response.to.have.status(400); });",
+                  "pm.test('código VALIDATION_ERROR', function () { pm.expect(pm.response.json().code).to.eql('VALIDATION_ERROR'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenOwner}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"petId\": \"{{petMax}}\",\n  \"kind\": \"INTERNAL\",\n  \"product\": \"Drontal\",\n  \"applicationDate\": \"2099-01-01\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/dewormings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "dewormings"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Estado de desparasitación (dueño)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('trae la última dosis por tipo', function () { const j = pm.response.json(); pm.expect(j.dewormings.INTERNAL).to.have.property('registered'); pm.expect(j.dewormings.INTERNAL).to.have.property('lastApplicationDate'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenOwner}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/dewormings?petId={{petMax}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "dewormings"
+              ],
+              "query": [
+                {
+                  "key": "petId",
+                  "value": "{{petMax}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Anular dosis registrada por error (dueño)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', function () { pm.response.to.have.status(201); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenOwner}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Se registró por error\",\n  \"status\": \"ENTERED_IN_ERROR\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/dewormings/{{ownerDewormingId}}/corrections",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "dewormings",
+                "{{ownerDewormingId}}",
+                "corrections"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Resumen clínico con datos de salud (dueño)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('trae alergias, esterilización y prevención', function () { const d = pm.response.json().data; pm.expect(d.allergies).to.be.an('array'); pm.expect(d.neutered).to.be.an('object'); pm.expect(d.prevention).to.be.an('object'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenOwner}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/pets/{{petMax}}/clinical-summary",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "pets",
+                "{{petMax}}",
+                "clinical-summary"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
       "name": "V1. Visitas",
       "item": [
         {
@@ -1957,7 +3252,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('status 200', function () { pm.response.to.have.status(200); });"
+                  "pm.test('status 201', function () { pm.response.to.have.status(201); });"
                 ]
               }
             }
@@ -1973,7 +3268,7 @@
                 }
               ]
             },
-            "method": "PUT",
+            "method": "POST",
             "header": [
               {
                 "key": "Content-Type",
@@ -1982,7 +3277,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"diagnosis\": \"Parvovirus\",\n  \"plan\": \"Hidratación IV 48 h\",\n  \"physicalExam\": \"Deshidratación leve\",\n  \"heartRate\": 90\n}",
+              "raw": "{\n  \"reason\": \"Corrección de prueba (motivo obligatorio)\",\n  \"diagnosis\": \"Parvovirus\",\n  \"plan\": \"Hidratación IV 48 h\",\n  \"physicalExam\": \"Deshidratación leve\",\n  \"heartRate\": 90\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1990,14 +3285,15 @@
               }
             },
             "url": {
-              "raw": "{{baseUrl}}/api/visits/{{visitId}}",
+              "raw": "{{baseUrl}}/api/visits/{{visitId}}/corrections",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
                 "visits",
-                "{{visitId}}"
+                "{{visitId}}",
+                "corrections"
               ]
             }
           },
@@ -2162,7 +3458,7 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/visits/veterinary/{{vetId}}?from=2026-01-01&to=2026-12-31",
+              "raw": "{{baseUrl}}/api/visits/veterinary/{{veterinaryId}}?from=2026-01-01&to=2026-12-31",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -2170,7 +3466,7 @@
                 "api",
                 "visits",
                 "veterinary",
-                "{{vetId}}"
+                "{{veterinaryId}}"
               ],
               "query": [
                 {
@@ -2296,7 +3592,8 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('status 201', function () { pm.response.to.have.status(201); });"
+                  "pm.test('status 201', function () { pm.response.to.have.status(201); });",
+                  "pm.collectionVariables.set('weightRecordId', pm.response.json().id);"
                 ]
               }
             }
@@ -2444,7 +3741,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('status 200', function () { pm.response.to.have.status(200); });"
+                  "pm.test('status 201', function () { pm.response.to.have.status(201); });"
                 ]
               }
             }
@@ -2460,7 +3757,7 @@
                 }
               ]
             },
-            "method": "PATCH",
+            "method": "POST",
             "header": [
               {
                 "key": "Content-Type",
@@ -2469,7 +3766,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"weight\": 12.7,\n  \"note\": \"Corrección\"\n}",
+              "raw": "{\n  \"reason\": \"Corrección de prueba (motivo obligatorio)\",\n  \"weight\": 12.7,\n  \"note\": \"Corrección\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2477,19 +3774,15 @@
               }
             },
             "url": {
-              "raw": "{{baseUrl}}/api/weight?petId={{petMax}}",
+              "raw": "{{baseUrl}}/api/weight/{{weightRecordId}}/corrections",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
-                "weight"
-              ],
-              "query": [
-                {
-                  "key": "petId",
-                  "value": "{{petMax}}"
-                }
+                "weight",
+                "{{weightRecordId}}",
+                "corrections"
               ]
             }
           },
@@ -2549,6 +3842,62 @@
               "path": [
                 "api",
                 "vaccines"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "NEGATIVO: dueño corrige vacuna de la clínica (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 403', function () { pm.response.to.have.status(403); });",
+                  "pm.test('código OWNER_CANNOT_CORRECT_CLINIC_ACT', function () { pm.expect(pm.response.json().code).to.eql('OWNER_CANNOT_CORRECT_CLINIC_ACT'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenOwner}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Intento del dueño\",\n  \"notes\": \"x\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/vaccines/{{vaccineId}}/corrections",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "vaccines",
+                "{{vaccineId}}",
+                "corrections"
               ]
             }
           },
@@ -2661,7 +4010,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('status 200', function () { pm.response.to.have.status(200); });"
+                  "pm.test('status 201', function () { pm.response.to.have.status(201); });"
                 ]
               }
             }
@@ -2677,7 +4026,7 @@
                 }
               ]
             },
-            "method": "PUT",
+            "method": "POST",
             "header": [
               {
                 "key": "Content-Type",
@@ -2686,7 +4035,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Antirrábica refuerzo\",\n  \"manufacturer\": \"Zoetis\",\n  \"notes\": \"Sin reacciones\"\n}",
+              "raw": "{\n  \"reason\": \"Corrección de prueba (motivo obligatorio)\",\n  \"name\": \"Antirrábica refuerzo\",\n  \"manufacturer\": \"Zoetis\",\n  \"notes\": \"Sin reacciones\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2694,14 +4043,118 @@
               }
             },
             "url": {
-              "raw": "{{baseUrl}}/api/vaccines/{{vaccineId}}",
+              "raw": "{{baseUrl}}/api/vaccines/{{vaccineId}}/corrections",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
                 "vaccines",
-                "{{vaccineId}}"
+                "{{vaccineId}}",
+                "corrections"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "NEGATIVO: clínica corrige vacuna del dueño (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 403', function () { pm.response.to.have.status(403); });",
+                  "pm.test('código NOT_CLINIC_ACT', function () { pm.expect(pm.response.json().code).to.eql('NOT_CLINIC_ACT'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenClinic}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Intento de la clínica\",\n  \"notes\": \"x\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/vaccines/{{ownerVaccineId}}/corrections",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "vaccines",
+                "{{ownerVaccineId}}",
+                "corrections"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Versiones de la vacuna (clínica)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('es una lista', function () { pm.expect(pm.response.json()).to.be.an('array'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenClinic}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/vaccines/{{vaccineId}}/corrections",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "vaccines",
+                "{{vaccineId}}",
+                "corrections"
               ]
             }
           },
@@ -2949,7 +4402,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('status 200', function () { pm.response.to.have.status(200); });"
+                  "pm.test('status 201', function () { pm.response.to.have.status(201); });"
                 ]
               }
             }
@@ -2965,7 +4418,7 @@
                 }
               ]
             },
-            "method": "PUT",
+            "method": "POST",
             "header": [
               {
                 "key": "Content-Type",
@@ -2974,7 +4427,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"notes\": \"Evolución favorable\",\n  \"status\": \"SUSPENDIDO\",\n  \"suspensionReason\": \"Reacción cutánea\"\n}",
+              "raw": "{\n  \"reason\": \"Corrección de prueba (motivo obligatorio)\",\n  \"notes\": \"Evolución favorable\",\n  \"status\": \"SUSPENDIDO\",\n  \"suspensionReason\": \"Reacción cutánea\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2982,14 +4435,15 @@
               }
             },
             "url": {
-              "raw": "{{baseUrl}}/api/treatments/{{treatmentId}}",
+              "raw": "{{baseUrl}}/api/treatments/{{treatmentId}}/corrections",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
                 "treatments",
-                "{{treatmentId}}"
+                "{{treatmentId}}",
+                "corrections"
               ]
             }
           },
@@ -3099,7 +4553,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('status 200', function () { pm.response.to.have.status(200); });"
+                  "pm.test('status 201', function () { pm.response.to.have.status(201); });"
                 ]
               }
             }
@@ -3115,7 +4569,7 @@
                 }
               ]
             },
-            "method": "PUT",
+            "method": "POST",
             "header": [
               {
                 "key": "Content-Type",
@@ -3124,7 +4578,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"status\": \"REACCION\",\n  \"reactionNote\": \"Reacción cutánea leve\",\n  \"endDate\": \"2026-10-05\"\n}",
+              "raw": "{\n  \"reason\": \"Corrección de prueba (motivo obligatorio)\",\n  \"status\": \"REACCION\",\n  \"reactionNote\": \"Reacción cutánea leve\",\n  \"endDate\": \"2026-10-05\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -3132,14 +4586,15 @@
               }
             },
             "url": {
-              "raw": "{{baseUrl}}/api/medications/{{medicationId}}",
+              "raw": "{{baseUrl}}/api/medications/{{medicationId}}/corrections",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
                 "medications",
-                "{{medicationId}}"
+                "{{medicationId}}",
+                "corrections"
               ]
             }
           },
@@ -3160,6 +4615,60 @@
                 "exec": [
                   "pm.test('status 201', function () { pm.response.to.have.status(201); });",
                   "if (pm.response.code === 201) { const j = pm.response.json(); pm.collectionVariables.set('surgeryId', j.data.id); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenClinic}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"petId\": \"{{petMax}}\",\n  \"veterinaryVisitId\": \"{{visitId}}\",\n  \"title\": \"Orquiectomía (esterilización)\",\n  \"description\": \"Orquiectomía prescrotal sin complicaciones\",\n  \"surgeryDate\": \"2026-11-03\",\n  \"durationMinutes\": 45,\n  \"anesthesiaUsed\": \"Propofol e isoflurano\",\n  \"postOpInstructions\": \"Collar isabelino por 10 días\",\n  \"veterinarian\": \"Dr. Luis Pérez\",\n  \"startsAt\": \"2026-11-03T08:30:00-05:00\",\n  \"asaRisk\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/surgery",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "surgery"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Cirugía de esterilización: sugiere actualizar el dato (clínica)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', function () { pm.response.to.have.status(201); });",
+                  "pm.test('trae la sugerencia de esterilización', function () { pm.expect(pm.response.json().suggestion.neutering).to.be.an('object'); });"
                 ]
               }
             }
@@ -3338,6 +4847,61 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
+                  "pm.test('status 201', function () { pm.response.to.have.status(201); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenClinic}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Corrección de prueba (motivo obligatorio)\",\n  \"postOpInstructions\": \"Collar isabelino 14 días\",\n  \"asaRisk\": 2,\n  \"startsAt\": \"2026-11-03T09:00:00-05:00\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/surgery/{{surgeryId}}/corrections",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "surgery",
+                "{{surgeryId}}",
+                "corrections"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Iniciar cirugía (clínica)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
                   "pm.test('status 200', function () { pm.response.to.have.status(200); });"
                 ]
               }
@@ -3354,7 +4918,7 @@
                 }
               ]
             },
-            "method": "PUT",
+            "method": "PATCH",
             "header": [
               {
                 "key": "Content-Type",
@@ -3363,7 +4927,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"postOpInstructions\": \"Collar isabelino 14 días\",\n  \"asaRisk\": 2,\n  \"startsAt\": \"2026-11-03T09:00:00-05:00\"\n}",
+              "raw": "{\n  \"status\": \"IN_PROGRESS\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -3385,7 +4949,7 @@
           "response": []
         },
         {
-          "name": "Cambiar estado (clínica)",
+          "name": "Completar cirugía (clínica)",
           "event": [
             {
               "listen": "test",
@@ -3425,14 +4989,14 @@
               }
             },
             "url": {
-              "raw": "{{baseUrl}}/api/surgery/72de1c64-d959-4639-bf52-7ec4f063c936",
+              "raw": "{{baseUrl}}/api/surgery/{{surgeryId}}",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
                 "surgery",
-                "72de1c64-d959-4639-bf52-7ec4f063c936"
+                "{{surgeryId}}"
               ]
             }
           },
@@ -3532,6 +5096,61 @@
               "path": [
                 "api",
                 "lab"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "NEGATIVO: corregir examen de la clínica con DUEÑO (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 403', function () { pm.response.to.have.status(403); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenOwner}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Corrección de prueba (motivo obligatorio)\",\n  \"result\": \"Normal\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/lab/{{labTestId}}/corrections",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "lab",
+                "{{labTestId}}",
+                "corrections"
               ]
             }
           },
@@ -3639,7 +5258,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('status 200', function () { pm.response.to.have.status(200); });"
+                  "pm.test('status 201', function () { pm.response.to.have.status(201); });"
                 ]
               }
             }
@@ -3655,7 +5274,7 @@
                 }
               ]
             },
-            "method": "PATCH",
+            "method": "POST",
             "header": [
               {
                 "key": "Content-Type",
@@ -3664,7 +5283,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"result\": \"Leucocitos 4000\",\n  \"status\": \"NORMAL\",\n  \"interpretation\": \"Sin cambios\",\n  \"results\": [\n    {\n      \"parameter\": \"Creatinina\",\n      \"result\": \"1.1\",\n      \"unit\": \"mg/dL\",\n      \"reference\": \"0.5 – 1.8\",\n      \"flag\": \"NORMAL\"\n    }\n  ]\n}",
+              "raw": "{\n  \"reason\": \"Corrección de prueba (motivo obligatorio)\",\n  \"result\": \"Leucocitos 4000\",\n  \"status\": \"NORMAL\",\n  \"interpretation\": \"Sin cambios\",\n  \"results\": [\n    {\n      \"parameter\": \"Creatinina\",\n      \"result\": \"1.1\",\n      \"unit\": \"mg/dL\",\n      \"reference\": \"0.5 – 1.8\",\n      \"flag\": \"NORMAL\"\n    }\n  ]\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -3672,19 +5291,15 @@
               }
             },
             "url": {
-              "raw": "{{baseUrl}}/api/lab?visit_id={{visitId}}",
+              "raw": "{{baseUrl}}/api/lab/{{labTestId}}/corrections",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
-                "lab"
-              ],
-              "query": [
-                {
-                  "key": "visit_id",
-                  "value": "{{visitId}}"
-                }
+                "lab",
+                "{{labTestId}}",
+                "corrections"
               ]
             }
           },
@@ -4111,6 +5726,636 @@
           "response": []
         }
       ]
+    },
+    {
+      "name": "V10. Datos clínicos de la mascota (clínica)",
+      "item": [
+        {
+          "name": "Confirmar alergia declarada por el dueño (clínica)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', function () { pm.response.to.have.status(201); });",
+                  "pm.test('devuelve la versión', function () { pm.expect(pm.response.json().version).to.be.a('number'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenClinic}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Confirmada en consulta\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/allergies/{{ownerAllergyId}}/confirm",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "allergies",
+                "{{ownerAllergyId}}",
+                "confirm"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "NEGATIVO: confirmar otra vez (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 409', function () { pm.response.to.have.status(409); });",
+                  "pm.test('código ALLERGY_NOT_SUSPECTED', function () { pm.expect(pm.response.json().code).to.eql('ALLERGY_NOT_SUSPECTED'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenClinic}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/allergies/{{ownerAllergyId}}/confirm",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "allergies",
+                "{{ownerAllergyId}}",
+                "confirm"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Registrar alergia (clínica, queda CONFIRMED)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', function () { pm.response.to.have.status(201); });",
+                  "pm.test('queda CONFIRMED', function () { pm.expect(pm.response.json().status).to.eql('CONFIRMED'); });",
+                  "pm.collectionVariables.set('clinicAllergyId', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenClinic}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"petId\": \"{{petMax}}\",\n  \"allergen\": \"Pollo\",\n  \"category\": \"FOOD\",\n  \"severity\": \"MILD\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/allergies",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "allergies"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "NEGATIVO: confirmar una alergia que registró la propia clínica (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 403', function () { pm.response.to.have.status(403); });",
+                  "pm.test('código NOT_OWNER_DECLARED', function () { pm.expect(pm.response.json().code).to.eql('NOT_OWNER_DECLARED'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenClinic}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/allergies/{{clinicAllergyId}}/confirm",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "allergies",
+                "{{clinicAllergyId}}",
+                "confirm"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "NEGATIVO: clínica corrige una alergia del dueño (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 403', function () { pm.response.to.have.status(403); });",
+                  "pm.test('código NOT_CLINIC_ACT', function () { pm.expect(pm.response.json().code).to.eql('NOT_CLINIC_ACT'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenClinic}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Intento de la clínica\",\n  \"reaction\": \"x\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/allergies/{{ownerAllergyId}}/corrections",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "allergies",
+                "{{ownerAllergyId}}",
+                "corrections"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Alergias y estado general (clínica)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('trae la lista', function () { pm.expect(pm.response.json().allergies).to.be.an('array'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenClinic}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/allergies?petId={{petMax}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "allergies"
+              ],
+              "query": [
+                {
+                  "key": "petId",
+                  "value": "{{petMax}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "NEGATIVO: clínica sin acceso a la mascota (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 403', function () { pm.response.to.have.status(403); });",
+                  "pm.test('código NO_ACCESS_TO_PET', function () { pm.expect(pm.response.json().code).to.eql('NO_ACCESS_TO_PET'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenClinic}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/allergies?petId={{petNotShared}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "allergies"
+              ],
+              "query": [
+                {
+                  "key": "petId",
+                  "value": "{{petNotShared}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Esterilización confirmada por la clínica",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('queda con confirmación de la clínica', function () { pm.expect(pm.response.json().neutered.confirmedByEmployeeId).to.be.a('string'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenClinic}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"neuteredStatus\": \"YES\",\n  \"neuteredAt\": \"2024-03-01\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/pets/{{petMax}}/clinical-profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "pets",
+                "{{petMax}}",
+                "clinical-profile"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Registrar última desparasitación externa (clínica)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', function () { pm.response.to.have.status(201); });",
+                  "pm.test('devuelve el id del registro', function () { pm.expect(pm.response.json().id).to.be.a('string'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenClinic}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"petId\": \"{{petMax}}\",\n  \"kind\": \"EXTERNAL\",\n  \"product\": \"Frontline\",\n  \"applicationDate\": \"2026-10-01\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/dewormings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "dewormings"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Estado de desparasitación (clínica)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('trae la última dosis del tipo externo', function () { pm.expect(pm.response.json().dewormings.EXTERNAL).to.have.property('lastApplicationDate'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenClinic}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/dewormings?petId={{petMax}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "dewormings"
+              ],
+              "query": [
+                {
+                  "key": "petId",
+                  "value": "{{petMax}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Resumen clínico (clínica, recepción)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('trae prevención', function () { pm.expect(pm.response.json().data.prevention).to.be.an('object'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenClinic}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/pets/{{petMax}}/clinical-summary",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "pets",
+                "{{petMax}}",
+                "clinical-summary"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Agregar medicación que coincide con una alergia (aviso, clínica)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', function () { pm.response.to.have.status(201); });",
+                  "pm.test('avisa de la alergia a penicilina', function () { const w = pm.response.json().allergyWarnings; pm.expect(w).to.be.an('array'); pm.expect(w.length).to.be.above(0); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenClinic}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Penicilina G procaína\",\n  \"dosage\": \"1 ml\",\n  \"frequency\": \"cada 24 h\",\n  \"duration\": \"5 días\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/treatments/{{treatmentId}}/add-medication",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "treatments",
+                "{{treatmentId}}",
+                "add-medication"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
     }
   ],
   "variable": [
@@ -4136,10 +6381,6 @@
     {
       "key": "internalKey",
       "value": "dev-internal-key"
-    },
-    {
-      "key": "vetId",
-      "value": "00000000-0000-4000-8000-000000000100"
     },
     {
       "key": "petMax",
@@ -4199,6 +6440,22 @@
     },
     {
       "key": "documentId",
+      "value": ""
+    },
+    {
+      "key": "weightRecordId",
+      "value": ""
+    },
+    {
+      "key": "ownerAllergyId",
+      "value": ""
+    },
+    {
+      "key": "clinicAllergyId",
+      "value": ""
+    },
+    {
+      "key": "ownerDewormingId",
       "value": ""
     }
   ]

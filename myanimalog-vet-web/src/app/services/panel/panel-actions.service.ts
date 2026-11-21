@@ -11,6 +11,7 @@ import { ConfirmData, ConfirmDialog } from '@shared/components/dialogs/confirm.d
 import { InviteColleagueDialog } from '@shared/components/dialogs/invite-colleague.dialog';
 import { LinkCodeDialog } from '@shared/components/dialogs/link-code.dialog';
 import { NewAppointmentData, NewAppointmentDialog } from '@shared/components/dialogs/new-appointment.dialog';
+import { ReasonData, ReasonDialog } from '@shared/components/dialogs/reason.dialog';
 import { ProfessionalSchedulesDialog } from '@shared/components/dialogs/professional-schedules.dialog';
 import { ScheduleDialog } from '@shared/components/dialogs/schedule.dialog';
 import { ServiceDialog, ServiceInput } from '@shared/components/dialogs/service.dialog';
@@ -46,7 +47,7 @@ export class PanelActionsService {
     this.dialog
       .open(NewAppointmentDialog, { data, autoFocus: 'first-tabbable' })
       .afterClosed()
-      .subscribe((saved) => saved && this.snack.open('Cita agendada', 'Cerrar', { duration: 3000 }));
+      .subscribe((saved) => saved && this.snack.open(data?.reschedule ? 'Cita reprogramada' : 'Cita agendada', 'Cerrar', { duration: 3000 }));
   }
 
   addPatient(): void {
@@ -72,6 +73,11 @@ export class PanelActionsService {
       .pipe(map((ok) => ok === true));
   }
 
+  /** Pide el motivo (rechazar o cancelar una cita). Emite el texto, o nada si se vuelve atrás. */
+  askReason(data: ReasonData): Observable<string | undefined> {
+    return this.dialog.open<ReasonDialog, ReasonData, string>(ReasonDialog, { ...MODAL, data }).afterClosed();
+  }
+
   changeRole(member: Member): Observable<MemberRole | undefined> {
     return this.dialog.open<ChangeRoleDialog, Member, MemberRole>(ChangeRoleDialog, { ...MODAL, data: member }).afterClosed();
   }
@@ -92,7 +98,7 @@ export class PanelActionsService {
   }
 
   professionalSchedules(): Observable<boolean | undefined> {
-    if (!this.manager() || !this.available('schedule')) return EMPTY;
+    if (!this.manager() || !this.available('professionalSchedule')) return EMPTY;
     return this.dialog.open<ProfessionalSchedulesDialog, void, boolean>(ProfessionalSchedulesDialog, MODAL).afterClosed();
   }
 

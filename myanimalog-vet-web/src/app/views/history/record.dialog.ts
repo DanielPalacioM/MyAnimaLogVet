@@ -8,7 +8,7 @@ import { VetField } from '@shared/components/form-field/form-field.component';
 import { VetModal } from '@shared/components/modal/modal.component';
 import { Observable } from 'rxjs';
 
-export type RecordKind = 'weight' | 'vaccine' | 'visit' | 'treatment' | 'medication' | 'surgery' | 'lab' | 'surgeryStatus';
+export type RecordKind = 'weight' | 'vaccine' | 'visit' | 'treatment' | 'medication' | 'surgery' | 'lab' | 'surgeryStatus' | 'allergy' | 'allergyConfirm' | 'neutered' | 'deworming';
 export interface RecordData {
   kind: RecordKind;
   petId: string;
@@ -16,6 +16,13 @@ export interface RecordData {
   visits?: Visit[];
   /** Para agregar un medicamento o cambiar el estado de una cirugía. */
   targetId?: string;
+  /** Nombre de la alergia que se confirma. */
+  label?: string;
+  /** Para precargar la esterilización actual. */
+  neuteredStatus?: 'YES' | 'NO' | 'UNKNOWN';
+  neuteredAt?: string;
+  /** Tipo de desparasitación con el que abre el diálogo. */
+  dewormingKind?: 'INTERNAL' | 'EXTERNAL';
 }
 
 const TITLES: Record<RecordKind, { title: string; subtitle: string; save: string }> = {
@@ -27,6 +34,10 @@ const TITLES: Record<RecordKind, { title: string; subtitle: string; save: string
   surgery: { title: 'Programar cirugía', subtitle: 'Se agrega a una consulta de la mascota. El dueño la ve en su app.', save: 'Guardar cirugía' },
   surgeryStatus: { title: 'Cambiar estado de la cirugía', subtitle: 'Queda registrado con tu nombre.', save: 'Guardar estado' },
   lab: { title: 'Agregar examen', subtitle: 'Resultado y parámetros con su rango normal.', save: 'Guardar examen' },
+  allergy: { title: 'Registrar alergia', subtitle: 'Queda confirmada con tu nombre. Las demás clínicas y el dueño la ven.', save: 'Guardar alergia' },
+  allergyConfirm: { title: 'Confirmar alergia', subtitle: 'El dueño la declaró en la app. Al confirmarla queda verificada con tu nombre.', save: 'Confirmar alergia' },
+  neutered: { title: 'Confirmar esterilización', subtitle: 'Queda con tu nombre. El dueño ve que la confirmó una clínica.', save: 'Guardar' },
+  deworming: { title: 'Registrar desparasitación', subtitle: 'Queda con el nombre de tu clínica. El dueño recibe el recordatorio de la próxima dosis.', save: 'Guardar desparasitación' },
 };
 
 const today = (): string => {
@@ -262,11 +273,98 @@ const today = (): string => {
               <textarea id="rc-interp" class="vet-input" rows="2" formControlName="interpretation"></textarea>
             </vet-field>
           }
+          @case ('allergy') {
+            <vet-field label="Alérgeno" for="rc-allergen" [control]="form.controls['allergen']" [messages]="{ required: 'Escribe a qué es alérgica.' }">
+              <input id="rc-allergen" class="vet-input" formControlName="allergen" placeholder="Ej. Penicilina" autocomplete="off" />
+            </vet-field>
+            <div class="row">
+              <vet-field label="Tipo" for="rc-acat" [control]="form.controls['category']">
+                <select id="rc-acat" class="vet-input" formControlName="category">
+                  <option value="DRUG">Medicamento</option>
+                  <option value="FOOD">Alimento</option>
+                  <option value="ENVIRONMENT">Ambiente</option>
+                  <option value="OTHER">Otro</option>
+                </select>
+              </vet-field>
+              <vet-field label="Gravedad" for="rc-asev" [control]="form.controls['severity']">
+                <select id="rc-asev" class="vet-input" formControlName="severity">
+                  <option value="MILD">Leve</option>
+                  <option value="MODERATE">Moderada</option>
+                  <option value="SEVERE">Grave</option>
+                </select>
+              </vet-field>
+            </div>
+            <vet-field label="Reacción" for="rc-areact" [control]="form.controls['reaction']" [optional]="true">
+              <input id="rc-areact" class="vet-input" formControlName="reaction" placeholder="Ej. Urticaria" autocomplete="off" />
+            </vet-field>
+          }
+          @case ('allergyConfirm') {
+            <p class="plain">Alergia: <b>{{ data.label }}</b></p>
+            <vet-field label="Motivo" for="rc-creason" [control]="form.controls['reason']" [messages]="{ required: 'Escribe el motivo.' }">
+              <input id="rc-creason" class="vet-input" formControlName="reason" autocomplete="off" />
+            </vet-field>
+          }
+          @case ('neutered') {
+            <div class="row">
+              <vet-field label="¿Está esterilizada?" for="rc-nst" [control]="form.controls['status']">
+                <select id="rc-nst" class="vet-input" formControlName="status">
+                  <option value="YES">Sí</option>
+                  <option value="NO">No</option>
+                  <option value="UNKNOWN">Sin confirmar</option>
+                </select>
+              </vet-field>
+              @if (form.controls['status'].value === 'YES') {
+                <vet-field label="Fecha (aprox.)" for="rc-nat" [control]="form.controls['at']" [optional]="true">
+                  <input id="rc-nat" class="vet-input" type="date" formControlName="at" [max]="todayStr" />
+                </vet-field>
+              }
+            </div>
+          }
+          @case ('deworming') {
+            <div class="row">
+              <vet-field label="Tipo" for="rc-dk" [control]="form.controls['kind']">
+                <select id="rc-dk" class="vet-input" formControlName="kind">
+                  <option value="INTERNAL">Interna (lombrices)</option>
+                  <option value="EXTERNAL">Externa (pulgas y garrapatas)</option>
+                </select>
+              </vet-field>
+              <vet-field label="Producto" for="rc-dp" [control]="form.controls['product']" [messages]="{ required: 'Escribe el producto.' }">
+                <input id="rc-dp" class="vet-input" formControlName="product" placeholder="Ej. Drontal" autocomplete="off" />
+              </vet-field>
+            </div>
+            <div class="row">
+              <vet-field label="Dosis" for="rc-dd" [control]="form.controls['dose']" [optional]="true">
+                <input id="rc-dd" class="vet-input" formControlName="dose" placeholder="Ej. 1 tableta" autocomplete="off" />
+              </vet-field>
+              <vet-field label="Peso hoy (kg)" for="rc-dw" [control]="form.controls['weightKg']" [optional]="true">
+                <input id="rc-dw" class="vet-input" type="number" step="0.1" min="0" formControlName="weightKg" />
+              </vet-field>
+            </div>
+            <div class="row">
+              <vet-field label="Aplicada el" for="rc-da" [control]="form.controls['applicationDate']" [messages]="{ required: 'Elige la fecha.' }">
+                <input id="rc-da" class="vet-input" type="date" formControlName="applicationDate" [max]="todayStr" />
+              </vet-field>
+              <vet-field label="Próxima dosis" for="rc-dn" [control]="form.controls['nextDoseDate']" [optional]="true">
+                <input id="rc-dn" class="vet-input" type="date" formControlName="nextDoseDate" />
+              </vet-field>
+            </div>
+            <vet-field label="Notas" for="rc-dnotes" [control]="form.controls['notes']" [optional]="true">
+              <input id="rc-dnotes" class="vet-input" formControlName="notes" autocomplete="off" />
+            </vet-field>
+          }
+        }
+
+        @if (warnings().length) {
+          <p class="warn" role="alert"><b>Ojo con las alergias:</b> {{ warnings().join(' · ') }}</p>
         }
 
         <ng-container footer>
           <button type="button" class="btn btn--ghost" (click)="ref.close()">Cancelar</button>
-          <button type="submit" class="btn" [disabled]="busy()">{{ busy() ? 'Guardando…' : text.save }}</button>
+          @if (warnings().length) {
+            <button type="button" class="btn" (click)="ref.close(true)">Entendido</button>
+          } @else {
+            <button type="submit" class="btn" [disabled]="busy()">{{ busy() ? 'Guardando…' : text.save }}</button>
+          }
         </ng-container>
       </vet-modal>
     </form>
@@ -276,6 +374,8 @@ const today = (): string => {
     .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     .row.four { grid-template-columns: repeat(4, 1fr); }
     .error { margin: 0; padding: 10px 12px; border-radius: 8px; background: #fef3f2; color: #b42318; font: 700 13px/1.35 'Afacad', sans-serif; }
+    .plain { margin: 0; font: 500 14px/1.4 'Afacad', sans-serif; }
+    .warn { margin: 0; padding: 10px 12px; border: 1.5px solid #f5a623; border-radius: 8px; background: #fff7ea; color: #1a1a2e; font: 500 13px/1.4 'Afacad', sans-serif; }
     .btn { height: 41px; border: 2px solid #4037be; border-radius: 5px; background: #4037be; color: #fff; font: 700 15px/1 'Afacad', sans-serif; cursor: pointer; }
     .btn:disabled { opacity: 0.6; cursor: default; }
     .btn--ghost { border-color: #000; background: #fff; color: #1a1a2e; }
@@ -299,6 +399,9 @@ export class RecordDialog {
   protected readonly text = TITLES[this.data.kind];
   protected readonly busy = signal(false);
   protected readonly error = signal<string | null>(null);
+  /** Avisos de alergia al agregar un medicamento que coincide con una registrada. */
+  protected readonly warnings = signal<string[]>([]);
+  protected readonly todayStr = today();
 
   protected readonly visits: Visit[] = [...(this.data.visits ?? [])].sort((a, b) => b.date.localeCompare(a.date));
   protected readonly form: FormGroup = this.buildForm();
@@ -316,6 +419,10 @@ export class RecordDialog {
       medication: { name: ['', Validators.required], dosage: ['', Validators.required], frequency: ['', Validators.required], duration: ['', Validators.required] },
       surgery: { veterinaryVisitId: [firstVisit, Validators.required], title: ['', Validators.required], surgeryDate: [today(), Validators.required], durationMinutes: [''], anesthesiaUsed: [''], asaRisk: [''], description: [''], postOpInstructions: [''] },
       surgeryStatus: { status: ['completed', Validators.required], outcome: [''] },
+      allergy: { allergen: ['', Validators.required], category: ['DRUG'], severity: ['MILD'], reaction: [''] },
+      allergyConfirm: { reason: ['Confirmada en consulta', Validators.required] },
+      neutered: { status: [this.data.neuteredStatus ?? 'YES'], at: [this.data.neuteredAt ?? ''] },
+      deworming: { kind: [this.data.dewormingKind ?? 'INTERNAL'], product: ['', Validators.required], dose: [''], weightKg: [''], applicationDate: [today(), Validators.required], nextDoseDate: [''], notes: [''] },
       lab: { visitId: [firstVisit, Validators.required], name: ['', Validators.required], date: [today(), Validators.required], laboratoryName: [''], status: ['NORMAL'], interpretation: [''], params: new FormArray([]) },
     };
     return this.fb.group(groups[this.data.kind] as never) as unknown as FormGroup;
@@ -393,6 +500,38 @@ export class RecordDialog {
           veterinarian: who || undefined,
         });
         break;
+      case 'allergy':
+        call = this.api.addAllergy({ petId, allergen: String(v['allergen']).trim(), category: String(v['category']), severity: String(v['severity']), reaction: str('reaction') });
+        break;
+      case 'allergyConfirm':
+        call = this.api.confirmAllergy(this.data.targetId!, String(v['reason']).trim());
+        break;
+      case 'neutered': {
+        const status = String(v['status']) as 'YES' | 'NO' | 'UNKNOWN';
+        const at = str('at');
+        if (status === 'YES' && at && at > today()) {
+          this.error.set('La fecha no puede ser futura.');
+          return;
+        }
+        call = this.api.setNeutered(petId, status, at);
+        break;
+      }
+      case 'deworming':
+        if (String(v['applicationDate']) > today()) {
+          this.error.set('La fecha de aplicación no puede ser futura.');
+          return;
+        }
+        call = this.api.addDeworming({
+          petId,
+          kind: String(v['kind']) as 'INTERNAL' | 'EXTERNAL',
+          product: String(v['product']).trim(),
+          applicationDate: String(v['applicationDate']),
+          dose: str('dose'),
+          weightKg: nr('weightKg'),
+          nextDoseDate: str('nextDoseDate'),
+          notes: str('notes'),
+        });
+        break;
       case 'surgeryStatus':
         call = this.api.updateSurgeryStatus(this.data.targetId!, { status: String(v['status']), outcome: str('outcome') });
         break;
@@ -431,7 +570,17 @@ export class RecordDialog {
     this.busy.set(true);
     this.error.set(null);
     call.subscribe({
-      next: () => this.ref.close(true),
+      next: (res: unknown) => {
+        // Agregar un medicamento que coincide con una alergia registrada: el backend guarda y avisa; se muestra antes de cerrar.
+        const w = (res as { allergyWarnings?: unknown } | null)?.allergyWarnings;
+        const list = Array.isArray(w) ? w.map((x) => (typeof x === 'string' ? x : String((x as { message?: string })?.message ?? (x as { allergen?: string })?.allergen ?? ''))).filter(Boolean) : [];
+        if (this.data.kind === 'medication' && list.length) {
+          this.busy.set(false);
+          this.warnings.set(list);
+          return;
+        }
+        this.ref.close(true);
+      },
       error: (e: unknown) => {
         this.busy.set(false);
         this.error.set(errorMessage(e, 'No pudimos guardar. Inténtalo de nuevo.'));

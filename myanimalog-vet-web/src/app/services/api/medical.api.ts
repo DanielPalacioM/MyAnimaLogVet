@@ -127,8 +127,91 @@ export interface LabEntry {
   results: LabParameter[];
 }
 
+/** Alergia de la mascota (carpetas D9 y V10). `SUSPECTED` = la declaró el dueño; `CONFIRMED` = la confirmó un veterinario. */
+export interface AllergyEntry {
+  id: string;
+  allergen: string;
+  /** `DRUG`, `FOOD`, `ENVIRONMENT` u `OTHER`. */
+  category: string;
+  /** `MILD`, `MODERATE` o `SEVERE`. */
+  severity: string;
+  reaction: string;
+  /** `SUSPECTED`, `CONFIRMED`, `RESOLVED` o `ENTERED_IN_ERROR`. */
+  state: string;
+  /** `OWNER` o `CLINIC`. */
+  source: string;
+  veterinaryName: string;
+  recordedAt: string;
+}
+
+/** "No sé" no es "no tiene": `UNKNOWN` es distinto de `NONE_KNOWN`. */
+export interface AllergyList {
+  status: 'UNKNOWN' | 'NONE_KNOWN' | 'HAS_ALLERGIES';
+  items: AllergyEntry[];
+}
+
+export interface NeuteredInfo {
+  status: 'YES' | 'NO' | 'UNKNOWN';
+  at: string;
+  /** `OWNER` o `CLINIC`. */
+  source: string;
+  /** La confirmó una clínica. */
+  confirmed: boolean;
+}
+
+export type DewormingType = 'INTERNAL' | 'EXTERNAL';
+
+export interface DewormingEntry {
+  id: string;
+  kind: DewormingType;
+  product: string;
+  dose: string;
+  weightKg: number | null;
+  applicationDate: string;
+  nextDoseDate: string;
+  /** `OWNER` o `CLINIC`. */
+  administeredBy: string;
+  notes: string;
+}
+
+/** Última dosis de un tipo. */
+export interface DewormingLast {
+  kind: DewormingType;
+  registered: boolean;
+  lastApplicationDate: string;
+  nextDoseDate: string;
+  product: string;
+}
+
+export interface DewormingStatus {
+  INTERNAL: DewormingLast;
+  EXTERNAL: DewormingLast;
+  /** Dosis anteriores, si el backend las manda además de la última por tipo. */
+  history: DewormingEntry[];
+}
+
+export interface NewAllergy {
+  petId: string;
+  allergen: string;
+  category: string;
+  severity: string;
+  reaction?: string;
+}
+
+export interface NewDeworming {
+  petId: string;
+  kind: DewormingType;
+  product: string;
+  applicationDate: string;
+  dose?: string;
+  weightKg?: number;
+  nextDoseDate?: string;
+  notes?: string;
+}
+
 /** Lo que ve recepción (`CLINICAL_READ_BASIC`) y la cabecera de la historia. La forma exacta la define el backend: se muestran los campos que lleguen. */
 export interface ClinicalSummary {
+  neutered: NeuteredInfo;
   allergies: string[];
   activeTreatments: string[];
   vaccines: { valid: number; dueSoon: number; overdue: number } | null;
@@ -343,7 +426,71 @@ const toLab = (r: Raw): LabEntry => ({
   ),
 });
 
-const strings = (v: unknown): string[] => (Array.isArray(v) ? v.map((x) => (typeof x === 'string' ? x : text((x as Raw)?.['name'] ?? (x as Raw)?.['description']))).filter(Boolean) : []);
+const strings = (v: unknown): string[] => (Array.isArray(v) ? v.map((x) => (typeof x === 'string' ? x : text((x as Raw)?.['allergen'] ?? (x as Raw)?.['name'] ?? (x as Raw)?.['description']))).filter(Boolean) : []);
+
+const day10 = (v: unknown): string => (/^\d{4}-\d{2}-\d{2}/.test(text(v)) ? text(v).slice(0, 10) : '');
+
+const toNeutered = (raw: unknown): NeuteredInfo => {
+  const r: Raw = raw && typeof raw === 'object' ? (raw as Raw) : {};
+  const s = text(pick(r, 'status', 'neuteredStatus', 'neutered_status')).toUpperCase();
+  const confirmed = pick(r, 'confirmedByEmployeeId', 'confirmed_by_employee_id', 'confirmedBy', 'confirmedAt');
+  return {
+    status: s === 'YES' || s === 'NO' ? s : 'UNKNOWN',
+    at: day10(pick(r, 'at', 'neuteredAt', 'neutered_at', 'date')),
+    source: text(pick(r, 'source', 'neuteredSource')).toUpperCase(),
+    confirmed: !!confirmed,
+  };
+};
+
+const toAllergy = (r: Raw): AllergyEntry => ({
+  id: text(r['id']),
+  allergen: text(pick(r, 'allergen', 'name')),
+  category: text(r['category']).toUpperCase() || 'OTHER',
+  severity: text(r['severity']).toUpperCase() || 'MILD',
+  reaction: text(r['reaction']),
+  state: text(r['status']).toUpperCase() || 'SUSPECTED',
+  source: text(pick(r, 'source', 'origin')).toUpperCase(),
+  veterinaryName: text(pick(r, 'veterinaryName', 'veterinary_name')),
+  recordedAt: day10(pick(r, 'recordedAt', 'recorded_at', 'createdAt')),
+});
+
+const toAllergyList = (res: unknown): AllergyList => {
+  const r = (unwrap(res) ?? {}) as Raw;
+  const items = (Array.isArray(r) ? r : list(r['allergies'] ?? r)).filter((x) => x && typeof x === 'object').map(toAllergy);
+  const s = text(pick(r, 'allergyStatus', 'allergy_status')).toUpperCase();
+  const active = items.some((a) => a.state === 'SUSPECTED' || a.state === 'CONFIRMED');
+  return { status: s === 'NONE_KNOWN' || s === 'HAS_ALLERGIES' || s === 'UNKNOWN' ? s : active ? 'HAS_ALLERGIES' : 'UNKNOWN', items };
+};
+
+const toDewormingEntry = (r: Raw, kind: DewormingType = 'INTERNAL'): DewormingEntry => ({
+  id: text(pick(r, 'id', 'dewormingId')),
+  kind: text(pick(r, 'kind', 'type')).toUpperCase() === 'EXTERNAL' ? 'EXTERNAL' : text(pick(r, 'kind', 'type')) ? 'INTERNAL' : kind,
+  product: text(r['product']),
+  dose: text(r['dose']),
+  weightKg: num(pick(r, 'weightKg', 'weight_kg')),
+  applicationDate: day10(pick(r, 'applicationDate', 'application_date', 'lastApplicationDate')),
+  nextDoseDate: day10(pick(r, 'nextDoseDate', 'next_dose_date')),
+  administeredBy: text(pick(r, 'administeredBy', 'administered_by')).toUpperCase(),
+  notes: text(r['notes']),
+});
+
+/** `{ dewormings: { INTERNAL: { registered, lastApplicationDate… }, EXTERNAL: … } }` y, si llega, la lista de dosis. */
+const toDewormings = (res: unknown): DewormingStatus => {
+  const root = unwrap(res);
+  const r: Raw = root && typeof root === 'object' && !Array.isArray(root) ? (root as Raw) : {};
+  const byKind: Raw = r['dewormings'] && typeof r['dewormings'] === 'object' && !Array.isArray(r['dewormings']) ? r['dewormings'] : r['prevention'] && typeof r['prevention'] === 'object' ? r['prevention'] : r;
+  const history = (Array.isArray(root) ? (root as Raw[]) : list(r['history'] ?? r['items'] ?? (Array.isArray(r['dewormings']) ? r['dewormings'] : [])))
+    .filter((x) => x && typeof x === 'object' && text(x['status']).toUpperCase() !== 'ENTERED_IN_ERROR')
+    .map((x) => toDewormingEntry(x))
+    .sort((a, b) => b.applicationDate.localeCompare(a.applicationDate));
+  const make = (kind: DewormingType): DewormingLast => {
+    const s: Raw = byKind[kind] && typeof byKind[kind] === 'object' ? byKind[kind] : {};
+    const own = history.find((h) => h.kind === kind);
+    const last = day10(pick(s, 'lastApplicationDate', 'last_application_date', 'applicationDate')) || own?.applicationDate || '';
+    return { kind, registered: s['registered'] === false ? false : !!(s['registered'] || last), lastApplicationDate: last, nextDoseDate: day10(pick(s, 'nextDoseDate', 'next_dose_date')) || own?.nextDoseDate || '', product: text(s['product']) || own?.product || '' };
+  };
+  return { INTERNAL: make('INTERNAL'), EXTERNAL: make('EXTERNAL'), history };
+};
 
 const toSummary = (res: unknown): ClinicalSummary => {
   const r = (unwrap(res) ?? {}) as Raw;
@@ -353,7 +500,8 @@ const toSummary = (res: unknown): ClinicalSummary => {
       ? { valid: Number(pick(v, 'valid', 'current', 'vigentes') ?? 0), dueSoon: Number(pick(v, 'dueSoon', 'due_soon', 'porVencer') ?? 0), overdue: Number(pick(v, 'overdue', 'vencidas') ?? 0) }
       : null;
   return {
-    allergies: strings(r['allergies']),
+    neutered: toNeutered(r['neutered']),
+    allergies: strings((Array.isArray(r['allergies']) ? (r['allergies'] as unknown[]) : []).filter((a) => typeof a === 'string' || !['RESOLVED', 'ENTERED_IN_ERROR'].includes(text((a as Raw)?.['status']).toUpperCase()))),
     activeTreatments: strings(pick(r, 'activeTreatments', 'active_treatments')),
     vaccines,
     lastWeight: num(pick(r, 'lastWeight', 'last_weight', 'latestWeight')),
@@ -447,9 +595,45 @@ export class MedicalApi {
     return this.http.post<unknown>(`${USER_API}/treatments/${treatmentId}/add-medication`, body).pipe(mapApiError());
   }
 
-  /** V4. Suspende o termina un tratamiento (`status`, `suspensionReason`). */
-  updateTreatment(treatmentId: string, body: { status?: string; suspensionReason?: string; notes?: string }): Observable<unknown> {
-    return this.http.put<unknown>(`${USER_API}/treatments/${treatmentId}`, body).pipe(mapApiError());
+  /** V4. Suspende o termina un tratamiento. El PUT ya no existe: se corrige en `/corrections` con un motivo obligatorio. */
+  updateTreatment(treatmentId: string, body: { status?: string; suspensionReason?: string; notes?: string }, reason: string): Observable<unknown> {
+    return this.http.post<unknown>(`${USER_API}/treatments/${treatmentId}/corrections`, { ...body, reason }).pipe(mapApiError());
+  }
+
+  // ---- Salud de la mascota: alergias, esterilización y desparasitación (carpetas D9 y V10) ----
+
+  /** Alergias y estado general. `CLINICAL_READ_BASIC`: también las ve recepción. */
+  allergies(petId: string): Observable<AllergyList> {
+    const params = new HttpParams().set('petId', petId);
+    return this.http.get<unknown>(`${USER_API}/allergies`, { params }).pipe(map(toAllergyList), mapApiError());
+  }
+
+  /** La clínica registra una alergia nueva: queda `CONFIRMED`. Veterinario con tarjeta (`CLINICAL_WRITE`). */
+  addAllergy(body: NewAllergy): Observable<unknown> {
+    return this.http.post<unknown>(`${USER_API}/allergies`, body).pipe(mapApiError());
+  }
+
+  /** Confirma una alergia que declaró el dueño (`SUSPECTED` → `CONFIRMED`). Solo veterinario con tarjeta. */
+  confirmAllergy(id: string, reason: string): Observable<unknown> {
+    return this.http.post<unknown>(`${USER_API}/allergies/${id}/confirm`, { reason }).pipe(mapApiError());
+  }
+
+  /** Esterilización confirmada por la clínica (queda con el empleado que la confirmó). */
+  setNeutered(petId: string, status: 'YES' | 'NO' | 'UNKNOWN', at?: string): Observable<NeuteredInfo> {
+    const body: { neuteredStatus: string; neuteredAt?: string } = { neuteredStatus: status };
+    if (status === 'YES' && at) body.neuteredAt = at;
+    return this.http.put<Raw>(`${USER_API}/pets/${petId}/clinical-profile`, body).pipe(map((r) => toNeutered(r?.['neutered'] ?? r?.['data']?.['neutered'])), mapApiError());
+  }
+
+  /** Última dosis por tipo y, si el backend la manda, el historial. */
+  dewormings(petId: string): Observable<DewormingStatus> {
+    const params = new HttpParams().set('petId', petId);
+    return this.http.get<unknown>(`${USER_API}/dewormings`, { params }).pipe(map(toDewormings), mapApiError());
+  }
+
+  /** `NURSING_WRITE` (auxiliar y veterinario): queda con origen clínica. */
+  addDeworming(body: NewDeworming): Observable<unknown> {
+    return this.http.post<unknown>(`${USER_API}/dewormings`, body).pipe(mapApiError());
   }
 
   /** V5. Programa una cirugía. Cuelga de una visita. */

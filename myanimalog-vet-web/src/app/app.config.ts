@@ -3,6 +3,7 @@ import { ApplicationConfig, provideBrowserGlobalErrorListeners, provideZoneChang
 import { PreloadAllModules, provideRouter, withComponentInputBinding, withPreloading } from '@angular/router';
 
 import { authInterceptor } from './auth/interceptor/auth.interceptor';
+import { retryInterceptor } from './auth/interceptor/retry.interceptor';
 import { routes } from './app.routes';
 
 export const appConfig: ApplicationConfig = {
@@ -10,7 +11,7 @@ export const appConfig: ApplicationConfig = {
     provideBrowserGlobalErrorListeners(),
     provideZoneChangeDetection({ eventCoalescing: true }),
     // Precarga los chunks lazy en segundo plano para que navegar sea instantáneo.
-    provideHttpClient(withInterceptors([authInterceptor])),
+    provideHttpClient(withInterceptors([retryInterceptor, authInterceptor])),
     provideRouter(routes, withComponentInputBinding(), withPreloading(PreloadAllModules)),
   ],
 };
