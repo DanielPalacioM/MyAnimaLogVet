@@ -11,6 +11,7 @@ import {
   LicenseState,
   Member,
   MemberRole,
+  NewPatient,
   Patient,
   ROLE_LABEL,
   ServiceCategory,
@@ -19,7 +20,7 @@ import {
 import { AppointmentDto } from './calendar.api';
 import { ServiceDto } from './catalog.api';
 import { BusinessHourDto, ScheduleBlockBody, ScheduleBlockDto } from './schedule.api';
-import { ClientDto, PatientDto } from './link.api';
+import { ClientDto, NewPatientBody, PatientDto } from './link.api';
 import { ClinicProfileDto, ColleagueProfileDto, EmployeeDto, InvitableRole, InvitationDto, LicenseStatusDto } from './api.models';
 
 const ROLE_FROM_API: Record<ClinicRole, MemberRole> = {
@@ -108,6 +109,20 @@ export function profileFrom(dto: ClinicProfileDto): ClinicProfile {
 }
 
 const initialsOf = (name: string) => name.split(' ').filter(Boolean).map((p) => p[0]).slice(0, 2).join('').toUpperCase();
+
+/** Cuerpo para registrar una mascota sin app (contrato propuesto, ver `LinkApi.registerPatient`). */
+export function patientBodyFrom(input: NewPatient): NewPatientBody {
+  const species = input.species === 'Perro' ? 'DOG' : input.species === 'Gato' ? 'CAT' : 'OTHER';
+  const phone = input.ownerPhone?.trim();
+  return {
+    name: input.name.trim(),
+    species,
+    breed: input.breed.trim(),
+    ...(input.birthDate ? { birthDate: input.birthDate } : {}),
+    ...(input.sex ? { sex: input.sex === 'Macho' ? ('MALE' as const) : ('FEMALE' as const) } : {}),
+    owner: { fullName: input.ownerName.trim(), email: input.ownerEmail.trim().toLowerCase(), ...(phone ? { phone } : {}) },
+  };
+}
 
 const SPECIES: Record<string, Species> = { DOG: 'Perro', CAT: 'Gato', PERRO: 'Perro', GATO: 'Gato' };
 

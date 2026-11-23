@@ -101,8 +101,9 @@ export class PatientsPage implements OnInit {
   }
 
   /** Abre la historia clínica del paciente (Medical, con el token de clínica): ahí se registra la visita. */
-  protected openHistory(petId: string): void {
-    void this.router.navigate(['/pacientes', petId, 'historia']);
+  /** Abre la historia clínica de la mascota; con `newVisit` abre además el formulario de "Registrar visita". */
+  protected openHistory(petId: string, newVisit = false): void {
+    void this.router.navigate(['/pacientes', petId, 'historia'], { queryParams: newVisit ? { nueva: 'visita' } : {} });
   }
 
   protected uploadDoc(): void {

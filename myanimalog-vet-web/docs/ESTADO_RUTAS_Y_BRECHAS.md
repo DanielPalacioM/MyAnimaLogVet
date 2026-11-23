@@ -71,7 +71,11 @@ cancelar y reprogramar llaman a Calendar. La cita trae `petName` (la colección 
 5. **Cita completa:** que `GET/PATCH …/appointments` devuelvan también `petId`, `serviceId`, `serviceName`, `price`, `notes`, `cancellationReason`, `cancelledBy`. Y los servicios, `employeeIds` (quién los presta).
 6. **`GET …/availability`** (franjas libres).
 7. **Documentos de la veterinaria** (`/documents`) publicados en el gateway.
-8. Una clínica aprobada con servicios, empleados, una mascota compartida y una cita de ejemplo, para la prueba de punta a punta.
+8. **Registrar paciente sin app** (el panel ya está listo, apagado con `features.patients`): `POST /api/veterinary/{id}/patients` con `{ name, species: DOG|CAT|OTHER, breed, birthDate?, sex?: MALE|FEMALE, owner: { fullName, email, phone? } }` → `201 { petId, claimInvitation: { email, expiresAt } }`; `409 OWNER_ALREADY_REGISTERED` si el correo ya tiene cuenta. Es una propuesta nuestra: confirmar o corregir el contrato.
+9. **Datos del cuidador en `GET /clients`:** `username`, `email` y `phone` (hoy solo llegan `name` y `email`).
+10. **Horario real para Calendar:** `GET /veterinaries/{id}/availability` o que Calendar lea el horario de Veterinary. Sin eso el panel y la app ofrecen un horario de guía (lun–vie 8–12 y 14–18, sáb 8–12) y el servidor responde `409 SLOT_UNAVAILABLE` a las horas que no son suyas.
+11. **Código de vinculación:** el panel muestra `inviteCode` sin `VET-` (ej. `KKKKD9UD`). Confirmar cuál es la forma oficial y cuál acepta `POST /links/preview`.
+12. Una clínica aprobada con servicios, empleados, una mascota compartida y una cita de ejemplo, para la prueba de punta a punta.
 
 ## 6. Cómo probar hoy
 

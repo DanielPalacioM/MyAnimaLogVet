@@ -495,7 +495,14 @@ export class HistoryPage implements OnInit {
     this.load(this.vaccines, this.api.vaccines(this.petId));
     this.load(this.weights, this.api.weights(this.petId));
     this.load(this.surgeries, this.api.surgeries(this.petId));
+    // Desde la ficha del paciente, "Registrar visita" llega con `?nueva=visita`: se abre el formulario una sola vez.
+    if (!this.visitFormOpened && this.route.snapshot.queryParamMap.get('nueva') === 'visita' && this.canWriteClinical()) {
+      this.visitFormOpened = true;
+      setTimeout(() => this.add('visit'));
+    }
   }
+
+  private visitFormOpened = false;
 
   protected select(tab: HistoryTab): void {
     this.tab.set(tab);

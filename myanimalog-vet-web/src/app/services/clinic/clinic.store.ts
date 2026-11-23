@@ -18,6 +18,7 @@ import {
   hasProfessionalProfile,
   invitationFrom,
   memberFrom,
+  patientBodyFrom,
   patientFrom,
   profileFrom,
   roleFromApi,
@@ -625,10 +626,17 @@ export class ClinicStore {
     return blocked ? 'Bloqueado' : null;
   }
 
-  addPatient(input: NewPatient): Patient {
-    const patient: Patient = { id: `p-${Date.now()}`, ...input, lastVisit: 'Sin visitas', lastVisitService: '—', lastVisitAt: 0, vaccines: 'NONE', inApp: false };
-    this.patients.update((list) => [patient, ...list]);
-    return patient;
+  /**
+   * Registra una mascota **sin app** y manda la invitación al dueño para que la reclame. Se guarda en el servidor y se
+   * recarga la lista: nada queda solo en la pantalla. Sin la ruta publicada (flag `patients`) falla con un aviso claro.
+   */
+  registerPatient(input: NewPatient): Observable<{ invitedEmail: string | null }> {
+    const id = this.clinicId;
+    if (!id) return EMPTY;
+    if (!FEATURES.patients) return throwError(() => new ApiError('NOT_AVAILABLE', FEATURE_MESSAGE.patients));
+    return this.linkApi.registerPatient(id, patientBodyFrom(input)).pipe(
+      switchMap((res) => this.loadPeople().pipe(map(() => ({ invitedEmail: res.claimInvitation?.email ?? input.ownerEmail })))),
+    );
   }
 
   /**

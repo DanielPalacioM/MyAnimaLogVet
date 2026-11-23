@@ -36,6 +36,22 @@ export interface PatientDto {
   weight?: number | null;
 }
 
+/** Cuerpo propuesto para registrar una mascota sin app. */
+export interface NewPatientBody {
+  name: string;
+  species: 'DOG' | 'CAT' | 'OTHER';
+  breed: string;
+  /** `YYYY-MM-DD`. */
+  birthDate?: string;
+  sex?: 'MALE' | 'FEMALE';
+  owner: { fullName: string; email: string; phone?: string };
+}
+
+export interface RegisteredPatientDto {
+  petId: string;
+  claimInvitation?: { email: string; expiresAt: string } | null;
+}
+
 export interface UnlinkClientDto {
   userId: string;
   veterinaryId: string;
@@ -66,6 +82,16 @@ export class LinkApi {
   /** Quitar cliente (`CLINIC_CONFIGURE`): revoca sus mascotas y limpia correo y teléfono del lado de la clínica. `404 USER_NOT_LINKED`. */
   removeClient(veterinaryId: string, clientUserId: string): Observable<UnlinkClientDto> {
     return this.http.delete<UnlinkClientDto>(`${VET_API}/${veterinaryId}/clients/${clientUserId}`).pipe(mapApiError());
+  }
+
+  /**
+   * Registrar una mascota **sin app** (la clínica la crea y manda una invitación al correo del dueño para reclamarla).
+   * ⚠ El backend aún no publica esta ruta (flag `patients` apagada): el contrato es una propuesta, ver `docs/ESTADO_RUTAS_Y_BRECHAS.md`.
+   * Se espera `201 { petId, claimInvitation: { email, expiresAt } }`; `409 OWNER_ALREADY_REGISTERED` si el correo ya tiene cuenta
+   * (entonces debe vincularse con el código).
+   */
+  registerPatient(veterinaryId: string, body: NewPatientBody): Observable<RegisteredPatientDto> {
+    return this.http.post<RegisteredPatientDto>(`${VET_API}/${veterinaryId}/patients`, body).pipe(mapApiError());
   }
 
   patients(veterinaryId: string, page = 0, size = 100): Observable<PageDto<PatientDto>> {

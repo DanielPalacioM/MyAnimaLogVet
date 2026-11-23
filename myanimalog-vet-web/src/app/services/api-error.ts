@@ -62,6 +62,8 @@ const MESSAGES: Record<string, string> = {
   EMPLOYEE_NOT_ELIGIBLE: 'Ese profesional no presta ese servicio.',
   PET_NOT_OWNED: 'Esa mascota no pertenece al dueño de la cita.',
   PET_NOT_SHARED: 'El dueño no ha compartido esa mascota con la clínica.',
+  OWNER_ALREADY_REGISTERED: 'Ese correo ya tiene cuenta en MyAnimaLog. Pídele que se vincule con el código de la clínica y comparta su mascota.',
+  PET_ALREADY_REGISTERED: 'Esa mascota ya está registrada para ese dueño.',
   CLINIC_TOKEN_REQUIRED: 'Entra a la clínica para gestionar sus citas.',
   CANCELLATION_WINDOW_CLOSED: 'Ya pasó el plazo para cancelar esta cita.',
   ACTION_NOT_FOUND: 'Esa acción no existe para las citas.',

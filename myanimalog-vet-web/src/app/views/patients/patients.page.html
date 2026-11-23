@@ -123,7 +123,10 @@
         <button type="button" class="ss-link" (click)="claimLink(p.owner)">Enviar enlace para reclamar</button>
       }
       <ng-container footer>
-        <button type="button" class="ss-primary" (click)="openHistory(p.id)"><vet-icon name="plus" [size]="16" />Registrar visita</button>
+        <button type="button" class="ss-primary" (click)="openHistory(p.id, true)"><vet-icon name="plus" [size]="16" />Registrar visita</button>
+        <div class="ss-two">
+          <button type="button" (click)="openHistory(p.id)">Ver historia médica</button>
+        </div>
         <div class="ss-two">
           <button type="button" (click)="newAppointment(p.id)">Nueva cita</button>
           <button type="button" (click)="uploadDoc()">Subir documento</button>

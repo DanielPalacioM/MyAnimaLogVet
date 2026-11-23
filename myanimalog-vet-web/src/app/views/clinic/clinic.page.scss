@@ -11,7 +11,7 @@ h1 { margin: 0; color: #1a1a2e; font: 700 30px/1.25 'Afacad', sans-serif; }
 .btn--primary { border-color: #4037be; background: #4037be; color: #fff; }
 .btn--sm { height: 34px; padding: 0 14px; font-size: 13px; }
 
-.body { display: grid; grid-template-columns: minmax(0, 616px) minmax(320px, 368px); align-items: start; gap: 16px; }
+.body { display: grid; grid-template-columns: minmax(0, 1fr) clamp(320px, 36.8%, 480px); align-items: start; gap: 16px; }
 .col { display: flex; flex-direction: column; gap: 16px; }
 .card { overflow: hidden; border: 1.5px solid #e6e4f5; border-radius: 14px; background: #fff; transition: box-shadow 0.3s; }
 .card.flash { box-shadow: 0 0 0 3px #4037be; }

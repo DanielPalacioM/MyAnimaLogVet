@@ -1,7 +1,7 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { USER_API } from '@auth/auth.config';
-import { forkJoin, map, Observable, of } from 'rxjs';
+import { catchError, forkJoin, map, Observable, of, switchMap } from 'rxjs';
 import { mapApiError } from '../api-error';
 
 /**
@@ -388,8 +388,16 @@ const toTreatment = (r: Raw): TreatmentEntry => ({
   protocol: text(r['protocol']),
   status: text(r['status']),
   instructions: text(r['instructions']),
-  medications: (Array.isArray(r['medications']) ? r['medications'] : []).map(toMedication),
+  medications: medicationsOf(r).map(toMedication),
 });
+
+/** Los medicamentos del tratamiento: el backend los nombra distinto según la ruta. `null` si la respuesta no los trae. */
+const MEDICATION_KEYS = ['medications', 'medication', 'medicines', 'treatmentMedications', 'treatment_medications'];
+const medicationsKey = (r: Raw): string | undefined => MEDICATION_KEYS.find((k) => Array.isArray(r[k]));
+const medicationsOf = (r: Raw): Raw[] => {
+  const key = medicationsKey(r);
+  return key ? (r[key] as Raw[]) : [];
+};
 
 const toSurgery = (r: Raw): SurgeryEntry => ({
   id: text(r['id']),
@@ -550,7 +558,26 @@ export class MedicalApi {
 
   /** V1. Tratamientos de una visita. No hay un listado por mascota: se piden por visita. */
   treatmentsByVisit(visitId: string): Observable<TreatmentEntry[]> {
-    return this.http.get<unknown>(`${USER_API}/visits/${visitId}/treatment`).pipe(map((r) => list(r).map(toTreatment)), mapApiError());
+    return this.http.get<unknown>(`${USER_API}/visits/${visitId}/treatment`).pipe(
+      mapApiError(),
+      // El listado de la visita puede venir sin los medicamentos: esos tratamientos se completan con `GET /treatments/{id}`.
+      switchMap((res) => {
+        const rows = list(res);
+        if (!rows.length) return of<TreatmentEntry[]>([]);
+        return forkJoin(rows.map((row) => (medicationsKey(row) || !row['id'] ? of(toTreatment(row)) : this.treatment(text(row['id']), row))));
+      }),
+    );
+  }
+
+  /** `GET /treatments/{id}` con sus medicamentos. Si falla, queda lo que traía el listado. */
+  private treatment(id: string, fallback: Raw): Observable<TreatmentEntry> {
+    return this.http.get<unknown>(`${USER_API}/treatments/${id}`).pipe(
+      map((r) => {
+        const full = (unwrap(r) ?? {}) as Raw;
+        return toTreatment({ ...fallback, ...full, medications: medicationsOf(full) });
+      }),
+      catchError(() => of(toTreatment(fallback))),
+    );
   }
 
   /** V6. Laboratorios de una visita. No hay un listado por mascota: se piden por visita. */

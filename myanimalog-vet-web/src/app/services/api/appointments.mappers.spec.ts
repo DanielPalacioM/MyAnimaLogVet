@@ -122,3 +122,15 @@ describe('mappers de horario y bloqueos', () => {
     expect(back).toEqual(jasmine.objectContaining({ allDay: false, from: '09:00', to: '11:30', scope: 'emp-1', endDate: undefined }));
   });
 });
+
+describe('patientBodyFrom (registrar sin app)', () => {
+  it('arma el cuerpo con especie en inglés, correo en minúsculas y sin campos vacíos', async () => {
+    const { patientBodyFrom } = await import('./mappers');
+    expect(patientBodyFrom({ name: ' Max ', species: 'Perro', breed: 'Criollo', ownerName: 'Carlos Pérez', ownerEmail: ' Carlos@Correo.COM ' })).toEqual({
+      name: 'Max', species: 'DOG', breed: 'Criollo', owner: { fullName: 'Carlos Pérez', email: 'carlos@correo.com' },
+    });
+    expect(patientBodyFrom({ name: 'Mia', species: 'Gato', breed: 'Siamés', sex: 'Hembra', birthDate: '2024-05-01', ownerName: 'Ana Ruiz', ownerEmail: 'a@b.co', ownerPhone: '3001234567' })).toEqual({
+      name: 'Mia', species: 'CAT', breed: 'Siamés', sex: 'FEMALE', birthDate: '2024-05-01', owner: { fullName: 'Ana Ruiz', email: 'a@b.co', phone: '3001234567' },
+    });
+  });
+});

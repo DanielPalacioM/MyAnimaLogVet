@@ -85,13 +85,18 @@ export interface NewAppointment {
   minutes: number;
 }
 
+/** Mascota que la clínica registra sin app: el dueño recibe un correo para reclamarla. */
 export interface NewPatient {
   name: string;
   species: Species;
   breed: string;
-  age: string;
-  owner: string;
-  phone: string;
+  /** `YYYY-MM-DD`, opcional. */
+  birthDate?: string;
+  sex?: 'Macho' | 'Hembra';
+  ownerName: string;
+  /** Obligatorio: ahí llega la invitación para reclamar. */
+  ownerEmail: string;
+  ownerPhone?: string;
 }
 
 export interface Invitation {
