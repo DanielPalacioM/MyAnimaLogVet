@@ -134,6 +134,8 @@ Sin token responde `401 MISSING_TOKEN` en `/veterinaries/{id}/appointments` y `/
 y `GET/POST/DELETE …/schedule-blocks` (`employeeId` nulo = toda la clínica, `startsAt`/`endsAt`, `reason`). La forma exacta del PUT y del POST no está en Postman: si falla, el panel muestra el error del servidor.
 Sigue sin conectar el horario **por profesional** (`/employees/{id}/schedule`).
 
+**22 nov.** La colección nueva de Calendar mueve el catálogo **reservable** a Calendar (`GET /veterinaries/{id}/services`, ruta de dueño): el panel lo pide con el token normal y así "Nueva cita" ya tiene servicios. El CRUD del catálogo, el horario y los bloqueos siguen sin existir (404). Resumen completo en `ESTADO_RUTAS_Y_BRECHAS.md`.
+
 Se quitó "Llamar" y el teléfono del dueño en Agenda, Clientes y Pacientes: no es parte del producto.
 
 ## 7. Verificación contra el gateway (sin token)

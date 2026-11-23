@@ -1,6 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
-import { VET_API } from '@auth/auth.config';
+import { CALENDAR_API, VET_API } from '@auth/auth.config';
 import { map, Observable } from 'rxjs';
 import { mapApiError } from '../api-error';
 
@@ -33,6 +33,16 @@ export interface ServiceBody {
 export class CatalogApi {
   private readonly http = inject(HttpClient);
   private readonly base = (id: string) => `${VET_API}/${id}/services`;
+
+  /**
+   * Servicios **reservables en línea** de la clínica, del calendar-service (`{ services: [{ id, name, durationMinutes, price }] }`).
+   * Es lo único que hay publicado: el CRUD del catálogo (VET-31) aún no existe. Se pide con el token normal (ver `usesNormalToken`).
+   */
+  bookable(veterinaryId: string): Observable<ServiceDto[]> {
+    return this.http
+      .get<{ services?: ServiceDto[] } | ServiceDto[]>(`${CALENDAR_API}/veterinaries/${veterinaryId}/services`)
+      .pipe(map((res) => (Array.isArray(res) ? res : (res.services ?? [])).map((s) => ({ ...s, bookableOnline: true, active: s.active ?? true }))), mapApiError());
+  }
 
   list(veterinaryId: string): Observable<ServiceDto[]> {
     return this.http

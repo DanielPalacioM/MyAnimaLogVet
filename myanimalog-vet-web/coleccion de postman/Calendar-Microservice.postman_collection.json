@@ -1,0 +1,1917 @@
+{
+  "info": {
+    "_postman_id": "6a0f3c2e-9d41-4b7a-8e15-2c9d7f1a0b34",
+    "name": "Calendar Microservice",
+    "description": "Colección definitiva del microservicio de calendario: eventos (usuario y mascota), citas (dueño y clínica), acciones del ciclo de vida y jobs de recordatorios.\n\nQué llenar (solo esto, en el environment \"Calendar\"):\n- ownerEmail y ownerPassword: tu cuenta de dueño.\n- clinicEmail y clinicPassword: cuenta de empleado de la clínica (solo para carpetas 0.3, 0.4 y 3).\n- baseUrl: http://localhost:3000/api o la URL de Cloud Run.\n\nTodo lo demás se llena solo:\n- Tokens y userId: los guarda la carpeta 0 al hacer login.\n- IDs de clínica, servicios, empleados y mascotas: son variables de la colección (no los cambies).\n- IDs de citas y eventos creados: los guarda cada request que crea algo.\n- Fechas: se calculan en el pre-request.\n\nQué esperar:\n- Carpeta 0 y 1, y la carpeta 4: funcionan con solo llenar credenciales.\n- Carpetas 2 y 3: los casos de éxito dependen de que el servidor tenga los datos de prueba (SIM_*). Los casos de error pasan igual.\n\nOrden de uso:\n1. Ejecutar la carpeta 0 (Auth).\n2. Ejecutar el resto.\n\nNotas: las reservas de citas usan el lunes de la semana siguiente (a 7+ días) para que las fechas sigan siendo futuras. Ejecutar dos veces en la misma semana puede dar 409 SLOT_UNAVAILABLE en las solicitudes; es esperado.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "apptId",
+      "value": "",
+      "description": "Cita de clínica. La llena \"Agenda del día\" al correr."
+    },
+    {
+      "key": "ownerApptId",
+      "value": "",
+      "description": "Cita del dueño. La llena \"Solicitud OK\" al correr."
+    },
+    {
+      "key": "userEventId",
+      "value": "",
+      "description": "Evento de usuario. La llena \"Crear evento de usuario\" al correr."
+    },
+    {
+      "key": "petEventId",
+      "value": "",
+      "description": "Evento de mascota. La llena \"Crear evento de mascota\" al correr."
+    }
+  ],
+  "item": [
+    {
+      "name": "0. Autenticación",
+      "description": "Ejecutar primero. Obtiene ownerToken, clinicBaseToken y clinicToken, y deja userId = sub del dueño.",
+      "auth": {
+        "type": "noauth"
+      },
+      "item": [
+        {
+          "name": "Login",
+          "item": [
+            {
+              "name": "Login dueño",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{userServiceUrl}}{{loginPath}}",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"{{ownerEmail}}\",\n  \"password\": \"{{ownerPassword}}\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "try {",
+                      "pm.test(\"Login OK\", () => { pm.response.to.have.status(200); });",
+                      "const body = pm.response.json();",
+                      "const token = body.access_token || body.accessToken || body.token;",
+                      "pm.test(\"Respuesta con token\", () => { pm.expect(token, 'claves: ' + Object.keys(body).join(',')).to.be.a('string'); });",
+                      "if (token) {",
+                      "const part = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');",
+                      "const payload = JSON.parse(atob(part + '='.repeat((4 - part.length % 4) % 4)));",
+                      "pm.environment.set('ownerToken', token);",
+                      "}",
+                      "} catch (e) {",
+                      "  pm.test('Error en el script del test: ' + e.message, () => { throw e; });",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Login empleado de clínica",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{userServiceUrl}}{{loginPath}}",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"{{clinicEmail}}\",\n  \"password\": \"{{clinicPassword}}\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "try {",
+                      "pm.test(\"Login OK\", () => { pm.response.to.have.status(200); });",
+                      "const body = pm.response.json();",
+                      "const token = body.access_token || body.accessToken || body.token;",
+                      "if (token) { pm.environment.set('clinicBaseToken', token); }",
+                      "} catch (e) {",
+                      "  pm.test('Error en el script del test: ' + e.message, () => { throw e; });",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Tokens y verificación",
+          "item": [
+            {
+              "name": "JWKS del servicio User",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": "{{userServiceUrl}}/.well-known/jwks.json"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "try {",
+                      "pm.test(\"200 OK\", () => { pm.response.to.have.status(200); });",
+                      "pm.test(\"Tiene llaves RS256\", () => { pm.expect(pm.response.json().keys[0].alg).to.eql('RS256'); });",
+                      "} catch (e) {",
+                      "  pm.test('Error en el script del test: ' + e.message, () => { throw e; });",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Contexto de clínica",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "url": "{{userServiceUrl}}/auth/context/veterinary/878208d5-e583-4463-a8f2-9ae806ccffc8",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{clinicBaseToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "try {",
+                      "pm.test(\"Contexto OK\", () => { pm.response.to.have.status(200); });",
+                      "const body = pm.response.json();",
+                      "const token = body.access_token || body.accessToken || body.token;",
+                      "if (token) {",
+                      "  pm.environment.set('clinicToken', token);",
+                      "  const part = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');",
+                      "  const payload = JSON.parse(atob(part + '='.repeat((4 - part.length % 4) % 4)));",
+                      "  pm.test('ctx VETERINARY y vet_id correcto', () => { pm.expect(payload.ctx).to.eql('VETERINARY'); pm.expect(payload.vet_id).to.eql('878208d5-e583-4463-a8f2-9ae806ccffc8'); });",
+                      "}",
+                      "} catch (e) {",
+                      "  pm.test('Error en el script del test: ' + e.message, () => { throw e; });",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "1. Eventos",
+      "description": "API de eventos personales y de mascota. Usa userId (del login) y petToby.",
+      "auth": {
+        "type": "bearer",
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{ownerToken}}",
+            "type": "string"
+          }
+        ]
+      },
+      "item": [
+        {
+          "name": "Crear",
+          "item": [
+            {
+              "name": "Crear evento de usuario (201, sin petId)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{baseUrl}}/calendar-events",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"userId\": \"36d2109a-08fe-4329-8024-4a1ce379b261\",\n  \"title\": \"Recordatorio general\",\n  \"description\": \"Evento de calendario de usuario\",\n  \"eventType\": \"OTHER\",\n  \"startDate\": \"2026-12-15T10:00:00.000Z\",\n  \"endDate\": \"2026-12-15T11:00:00.000Z\",\n  \"location\": \"Casa\",\n  \"reminderAt\": \"2026-12-14T10:00:00.000Z\",\n  \"reminderEnabled\": true\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "try {",
+                      "pm.test(\"201 Created\", () => { pm.response.to.have.status(201); });",
+                      "pm.test(\"Sin petId => pet_id null\", () => { pm.expect(pm.response.json().pet_id).to.be.null; });",
+                      "if (pm.response.code === 201) { pm.collectionVariables.set('userEventId', pm.response.json().id); }",
+                      "} catch (e) {",
+                      "  pm.test('Error en el script del test: ' + e.message, () => { throw e; });",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Crear evento de mascota (201, con petId)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{baseUrl}}/calendar-events",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"userId\": \"36d2109a-08fe-4329-8024-4a1ce379b261\",\n  \"petId\": \"a259a6ab-66d3-428f-b815-dc314e01c8ff\",\n  \"title\": \"Cita veterinaria\",\n  \"description\": \"Vacuna anual\",\n  \"eventType\": \"VET_APPOINTMENT\",\n  \"startDate\": \"2026-12-15T10:00:00.000Z\",\n  \"endDate\": \"2026-12-15T11:00:00.000Z\",\n  \"location\": \"Clínica Veterinaria Central\",\n  \"reminderAt\": \"2026-12-14T10:00:00.000Z\",\n  \"reminderEnabled\": true\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "try {",
+                      "pm.test(\"201 Created\", () => { pm.response.to.have.status(201); });",
+                      "pm.test(\"Con petId => pet_id de la mascota\", () => { pm.expect(pm.response.json().pet_id).to.eql('a259a6ab-66d3-428f-b815-dc314e01c8ff'); });",
+                      "if (pm.response.code === 201) { pm.collectionVariables.set('petEventId', pm.response.json().id); }",
+                      "} catch (e) {",
+                      "  pm.test('Error en el script del test: ' + e.message, () => { throw e; });",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Crear sin userId (401)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{baseUrl}}/calendar-events",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"title\": \"Sin usuario\",\n  \"eventType\": \"OTHER\",\n  \"startDate\": \"2026-12-15T10:00:00.000Z\",\n  \"endDate\": \"2026-12-15T11:00:00.000Z\",\n  \"reminderEnabled\": false\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "try {",
+                      "pm.test(\"401\", () => { pm.response.to.have.status(401); });",
+                      "} catch (e) {",
+                      "  pm.test('Error en el script del test: ' + e.message, () => { throw e; });",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Crear con eventType inválido (400)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{baseUrl}}/calendar-events",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"userId\": \"36d2109a-08fe-4329-8024-4a1ce379b261\",\n  \"title\": \"Tipo inválido\",\n  \"eventType\": \"BIRTHDAY\",\n  \"startDate\": \"2026-12-15T10:00:00.000Z\",\n  \"endDate\": \"2026-12-15T11:00:00.000Z\",\n  \"reminderEnabled\": false\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "try {",
+                      "pm.test(\"400\", () => { pm.response.to.have.status(400); });",
+                      "pm.test(\"Mensaje de tipo inválido\", () => { pm.expect(pm.response.json().error).to.eql('Invalid event type'); });",
+                      "} catch (e) {",
+                      "  pm.test('Error en el script del test: ' + e.message, () => { throw e; });",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Crear con endDate anterior a startDate (400)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{baseUrl}}/calendar-events",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"userId\": \"36d2109a-08fe-4329-8024-4a1ce379b261\",\n  \"title\": \"Fin antes de inicio\",\n  \"eventType\": \"OTHER\",\n  \"startDate\": \"2026-12-15T11:00:00.000Z\",\n  \"endDate\": \"2026-12-15T10:00:00.000Z\",\n  \"reminderEnabled\": false\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "try {",
+                      "pm.test(\"400\", () => { pm.response.to.have.status(400); });",
+                      "pm.test(\"Mensaje de fechas\", () => { pm.expect(pm.response.json().error).to.eql('End date cannot be before start date'); });",
+                      "} catch (e) {",
+                      "  pm.test('Error en el script del test: ' + e.message, () => { throw e; });",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Crear sin campos obligatorios (400)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{baseUrl}}/calendar-events",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"userId\": \"36d2109a-08fe-4329-8024-4a1ce379b261\",\n  \"title\": \"Sin fechas\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "try {",
+                      "pm.test(\"400\", () => { pm.response.to.have.status(400); });",
+                      "} catch (e) {",
+                      "  pm.test('Error en el script del test: ' + e.message, () => { throw e; });",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Consultar",
+          "item": [
+            {
+              "name": "Listar todos los eventos del usuario",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/calendar-events?userId=36d2109a-08fe-4329-8024-4a1ce379b261"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "try {",
+                      "pm.test(\"200 OK\", () => { pm.response.to.have.status(200); });",
+                      "pm.test(\"Arreglo events\", () => { pm.expect(pm.response.json().events).to.be.an('array'); });",
+                      "} catch (e) {",
+                      "  pm.test('Error en el script del test: ' + e.message, () => { throw e; });",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Listar calendario de usuario (calendarType=user)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/calendar-events?userId=36d2109a-08fe-4329-8024-4a1ce379b261&calendarType=user"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "try {",
+                      "pm.test(\"200 OK\", () => { pm.response.to.have.status(200); });",
+                      "pm.test(\"Solo eventos sin mascota\", () => { pm.response.json().events.forEach((e) => pm.expect(e.pet_id).to.be.null); });",
+                      "} catch (e) {",
+                      "  pm.test('Error en el script del test: ' + e.message, () => { throw e; });",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Listar calendario de mascotas (calendarType=pet)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/calendar-events?userId=36d2109a-08fe-4329-8024-4a1ce379b261&calendarType=pet"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "try {",
+                      "pm.test(\"200 OK\", () => { pm.response.to.have.status(200); });",
+                      "pm.test(\"Solo eventos con mascota\", () => { pm.response.json().events.forEach((e) => pm.expect(e.pet_id).to.not.be.null); });",
+                      "} catch (e) {",
+                      "  pm.test('Error en el script del test: ' + e.message, () => { throw e; });",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Listar eventos por mascota (petId)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/calendar-events?petId=a259a6ab-66d3-428f-b815-dc314e01c8ff"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "try {",
+                      "pm.test(\"200 OK\", () => { pm.response.to.have.status(200); });",
+                      "pm.test(\"Todos son de la mascota\", () => { pm.response.json().events.forEach((e) => pm.expect(e.pet_id).to.eql('a259a6ab-66d3-428f-b815-dc314e01c8ff')); });",
+                      "} catch (e) {",
+                      "  pm.test('Error en el script del test: ' + e.message, () => { throw e; });",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Listar sin userId ni petId (401)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/calendar-events"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "try {",
+                      "pm.test(\"401\", () => { pm.response.to.have.status(401); });",
+                      "} catch (e) {",
+                      "  pm.test('Error en el script del test: ' + e.message, () => { throw e; });",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Actualizar",
+          "item": [
+            {
+              "name": "Actualizar título y recordatorio (200)",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{baseUrl}}/calendar-events/{{userEventId}}",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"userId\": \"36d2109a-08fe-4329-8024-4a1ce379b261\",\n  \"title\": \"Recordatorio general (editado)\",\n  \"reminderAt\": \"2026-12-14T10:00:00.000Z\",\n  \"reminderEnabled\": true\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "try {",
+                      "pm.test(\"200 OK\", () => { pm.response.to.have.status(200); });",
+                      "pm.test(\"Título actualizado\", () => { pm.expect(pm.response.json().title).to.eql('Recordatorio general (editado)'); });",
+                      "} catch (e) {",
+                      "  pm.test('Error en el script del test: ' + e.message, () => { throw e; });",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Actualizar sin userId (401)",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{baseUrl}}/calendar-events/{{userEventId}}",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"title\": \"Sin usuario\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "try {",
+                      "pm.test(\"401\", () => { pm.response.to.have.status(401); });",
+                      "} catch (e) {",
+                      "  pm.test('Error en el script del test: ' + e.message, () => { throw e; });",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Actualizar sin campos (400)",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{baseUrl}}/calendar-events/{{userEventId}}",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"userId\": \"36d2109a-08fe-4329-8024-4a1ce379b261\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "try {",
+                      "pm.test(\"400 No fields to update\", () => { pm.response.to.have.status(400); });",
+                      "} catch (e) {",
+                      "  pm.test('Error en el script del test: ' + e.message, () => { throw e; });",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Actualizar como otro usuario (403)",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{baseUrl}}/calendar-events/{{userEventId}}",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"userId\": \"99999999-9999-4999-8999-999999999999\",\n  \"title\": \"Intento no autorizado\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "try {",
+                      "pm.test(\"403\", () => { pm.response.to.have.status(403); });",
+                      "} catch (e) {",
+                      "  pm.test('Error en el script del test: ' + e.message, () => { throw e; });",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Actualizar evento inexistente (404)",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{baseUrl}}/calendar-events/00000000-0000-0000-0000-000000000000",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"userId\": \"36d2109a-08fe-4329-8024-4a1ce379b261\",\n  \"title\": \"No existe\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "try {",
+                      "pm.test(\"404\", () => { pm.response.to.have.status(404); });",
+                      "} catch (e) {",
+                      "  pm.test('Error en el script del test: ' + e.message, () => { throw e; });",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Eliminar",
+          "item": [
+            {
+              "name": "Eliminar como otro usuario (403)",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": "{{baseUrl}}/calendar-events/{{userEventId}}?userId=99999999-9999-4999-8999-999999999999"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "try {",
+                      "pm.test(\"403\", () => { pm.response.to.have.status(403); });",
+                      "} catch (e) {",
+                      "  pm.test('Error en el script del test: ' + e.message, () => { throw e; });",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Eliminar sin userId (401)",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": "{{baseUrl}}/calendar-events/{{userEventId}}"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "try {",
+                      "pm.test(\"401\", () => { pm.response.to.have.status(401); });",
+                      "} catch (e) {",
+                      "  pm.test('Error en el script del test: ' + e.message, () => { throw e; });",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Eliminar evento de usuario (200)",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": "{{baseUrl}}/calendar-events/{{userEventId}}?userId=36d2109a-08fe-4329-8024-4a1ce379b261"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "try {",
+                      "pm.test(\"200 OK\", () => { pm.response.to.have.status(200); });",
+                      "pm.test(\"success = true\", () => { pm.expect(pm.response.json().success).to.be.true; });",
+                      "} catch (e) {",
+                      "  pm.test('Error en el script del test: ' + e.message, () => { throw e; });",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Eliminar evento de mascota (200)",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": "{{baseUrl}}/calendar-events/{{petEventId}}?userId=36d2109a-08fe-4329-8024-4a1ce379b261"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "try {",
+                      "pm.test(\"200 OK\", () => { pm.response.to.have.status(200); });",
+                      "} catch (e) {",
+                      "  pm.test('Error en el script del test: ' + e.message, () => { throw e; });",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Citas dueño",
+      "description": "Requiere ownerToken y que el servidor tenga SIM_OWNER_USER_ID = tu ownerSub. Los casos de error (401, 400, 403 de otro dueño) pasan sin eso; los de éxito (201) no.",
+      "auth": {
+        "type": "bearer",
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{ownerToken}}",
+            "type": "string"
+          }
+        ]
+      },
+      "item": [
+        {
+          "name": "Solicitudes",
+          "item": [
+            {
+              "name": "Solicitud OK (201, REQUESTED, 30 min)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{baseUrl}}/veterinaries/878208d5-e583-4463-a8f2-9ae806ccffc8/appointment-requests",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{ownerToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"serviceId\": \"f0cbc578-a78e-4162-9347-6c338d233b8b\",\n  \"petId\": \"a259a6ab-66d3-428f-b815-dc314e01c8ff\",\n  \"startsAt\": \"2026-12-07T15:00:00.000Z\",\n  \"notes\": \"Se lame la herida por las noches\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "try {",
+                      "pm.test(\"201 Created\", () => { pm.response.to.have.status(201); });",
+                      "const b = pm.response.json();",
+                      "pm.test('REQUESTED', () => pm.expect(b.status).to.eql('REQUESTED'));",
+                      "pm.test('Origen APP', () => pm.expect(b.origin).to.eql('APP'));",
+                      "pm.test('El empleado asignado es el esperado', () => pm.expect(b.employeeId).to.eql('bb1f605e-7fee-41f9-91ac-8a4d19a5a4f8'));",
+                      "pm.test('Duración 30 min', () => pm.expect(new Date(b.endsAt) - new Date(b.startsAt)).to.eql(30 * 60000));",
+                      "pm.test('Trae el nombre de la mascota', () => pm.expect(b.petName).to.be.a('string'));",
+                      "pm.collectionVariables.set('ownerApptId', b.id);",
+                      "} catch (e) {",
+                      "  pm.test('Error en el script del test: ' + e.message, () => { throw e; });",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Sin token (401 MISSING_TOKEN)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{baseUrl}}/veterinaries/878208d5-e583-4463-a8f2-9ae806ccffc8/appointment-requests",
+                "auth": {
+                  "type": "noauth"
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"serviceId\": \"f0cbc578-a78e-4162-9347-6c338d233b8b\",\n  \"petId\": \"a259a6ab-66d3-428f-b815-dc314e01c8ff\",\n  \"startsAt\": \"2026-12-07T15:00:00.000Z\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "try {",
+                      "pm.test(\"401\", () => { pm.response.to.have.status(401); });",
+                      "pm.test(\"MISSING_TOKEN\", () => { pm.expect(pm.response.json().code).to.eql('MISSING_TOKEN'); });",
+                      "} catch (e) {",
+                      "  pm.test('Error en el script del test: ' + e.message, () => { throw e; });",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Mascota de otro dueño (403 PET_NOT_OWNED)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{baseUrl}}/veterinaries/878208d5-e583-4463-a8f2-9ae806ccffc8/appointment-requests",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{ownerToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"serviceId\": \"f0cbc578-a78e-4162-9347-6c338d233b8b\",\n  \"petId\": \"33333333-3333-4333-8333-333333333333\",\n  \"startsAt\": \"2026-12-07T15:00:00.000Z\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "try {",
+                      "pm.test(\"403\", () => { pm.response.to.have.status(403); });",
+                      "pm.test(\"PET_NOT_OWNED\", () => { pm.expect(pm.response.json().code).to.eql('PET_NOT_OWNED'); });",
+                      "} catch (e) {",
+                      "  pm.test('Error en el script del test: ' + e.message, () => { throw e; });",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Sin serviceId (400 VALIDATION_ERROR)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{baseUrl}}/veterinaries/878208d5-e583-4463-a8f2-9ae806ccffc8/appointment-requests",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{ownerToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"petId\": \"a259a6ab-66d3-428f-b815-dc314e01c8ff\",\n  \"startsAt\": \"2026-12-07T15:00:00.000Z\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "try {",
+                      "pm.test(\"400\", () => { pm.response.to.have.status(400); });",
+                      "pm.test(\"VALIDATION_ERROR\", () => { pm.expect(pm.response.json().code).to.eql('VALIDATION_ERROR'); });",
+                      "} catch (e) {",
+                      "  pm.test('Error en el script del test: ' + e.message, () => { throw e; });",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Token de clínica en ruta de dueño (403 OWNER_TOKEN_REQUIRED)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{baseUrl}}/veterinaries/878208d5-e583-4463-a8f2-9ae806ccffc8/appointment-requests",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{clinicToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"serviceId\": \"f0cbc578-a78e-4162-9347-6c338d233b8b\",\n  \"petId\": \"a259a6ab-66d3-428f-b815-dc314e01c8ff\",\n  \"startsAt\": \"2026-12-07T15:00:00.000Z\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "try {",
+                      "pm.test(\"403\", () => { pm.response.to.have.status(403); });",
+                      "pm.test(\"OWNER_TOKEN_REQUIRED\", () => { pm.expect(pm.response.json().code).to.eql('OWNER_TOKEN_REQUIRED'); });",
+                      "} catch (e) {",
+                      "  pm.test('Error en el script del test: ' + e.message, () => { throw e; });",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Catálogo",
+          "item": [
+            {
+              "name": "Servicios reservables en línea (200)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/veterinaries/878208d5-e583-4463-a8f2-9ae806ccffc8/services",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{ownerToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "try {",
+                      "pm.test(\"200 OK\", () => { pm.response.to.have.status(200); });",
+                      "pm.test(\"Respuesta con lista services\", () => { pm.expect(pm.response.json().services).to.be.an('array'); });",
+                      "pm.test(\"Cada servicio trae id, nombre, duración y precio\", () => { pm.response.json().services.forEach((s) => pm.expect(s).to.include.keys('id', 'name', 'durationMinutes', 'price')); });",
+                      "} catch (e) {",
+                      "  pm.test('Error en el script del test: ' + e.message, () => { throw e; });",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Servicios con token de clínica (403 OWNER_TOKEN_REQUIRED)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/veterinaries/878208d5-e583-4463-a8f2-9ae806ccffc8/services",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{clinicToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "try {",
+                      "pm.test(\"403\", () => { pm.response.to.have.status(403); });",
+                      "pm.test(\"OWNER_TOKEN_REQUIRED\", () => { pm.expect(pm.response.json().code).to.eql('OWNER_TOKEN_REQUIRED'); });",
+                      "} catch (e) {",
+                      "  pm.test('Error en el script del test: ' + e.message, () => { throw e; });",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Consultar y gestionar",
+          "item": [
+            {
+              "name": "Mis citas (GET /me/appointments)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/me/appointments?from=2026-12-07T00:00:00.000Z&to=2026-12-08T00:00:00.000Z",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{ownerToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "try {",
+                      "pm.test(\"200 OK\", () => { pm.response.to.have.status(200); });",
+                      "const list = pm.response.json().appointments;",
+                      "pm.test(\"Arreglo de citas\", () => { pm.expect(list).to.be.an('array'); });",
+                      "pm.test(\"Incluye la cita creada en 2.1\", () => { const id = pm.collectionVariables.get('ownerApptId'); if (id) { pm.expect(list.map((a) => a.id)).to.include(id); } });",
+                      "pm.test(\"Cada cita trae el nombre de la clínica\", () => { list.forEach((a) => pm.expect(a.clinicName).to.be.a('string')); });",
+                      "pm.test(\"Cada cita trae el nombre de la mascota\", () => { list.forEach((a) => pm.expect(a.petName).to.be.a('string')); });",
+                      "} catch (e) {",
+                      "  pm.test('Error en el script del test: ' + e.message, () => { throw e; });",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Agenda de la clínica con token de dueño (403 CLINIC_TOKEN_REQUIRED)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/veterinaries/878208d5-e583-4463-a8f2-9ae806ccffc8/appointments?from=2026-12-07T00:00:00.000Z&to=2026-12-08T00:00:00.000Z",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{ownerToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "try {",
+                      "pm.test(\"403\", () => { pm.response.to.have.status(403); });",
+                      "pm.test(\"CLINIC_TOKEN_REQUIRED\", () => { pm.expect(pm.response.json().code).to.eql('CLINIC_TOKEN_REQUIRED'); });",
+                      "} catch (e) {",
+                      "  pm.test('Error en el script del test: ' + e.message, () => { throw e; });",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Reprogramar a 11:00 Bogotá (200 o 409 si la franja está ocupada)",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{baseUrl}}/veterinaries/878208d5-e583-4463-a8f2-9ae806ccffc8/appointments/{{ownerApptId}}/reschedule",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{ownerToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"startsAt\": \"2026-12-07T16:00:00.000Z\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "try {",
+                      "pm.test(\"200 o 409\", () => { pm.expect([200, 409]).to.include(pm.response.code); });",
+                      "if (pm.response.code === 200) { pm.test('Nueva hora de inicio', () => pm.expect(pm.response.json().startsAt).to.eql('2026-12-07T16:00:00.000Z')); }",
+                      "} catch (e) {",
+                      "  pm.test('Error en el script del test: ' + e.message, () => { throw e; });",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Cancelar con motivo (200 o 409 si venció el plazo de 24 h)",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{baseUrl}}/veterinaries/878208d5-e583-4463-a8f2-9ae806ccffc8/appointments/{{ownerApptId}}/cancel",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{ownerToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"reason\": \"Ya no puedo llevarlo\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "try {",
+                      "pm.test(\"200 o 409\", () => { pm.expect([200, 409]).to.include(pm.response.code); });",
+                      "if (pm.response.code === 200) { pm.test('CANCELLED por el dueño', () => { const b = pm.response.json(); pm.expect(b.status).to.eql('CANCELLED'); pm.expect(b.cancelledBy).to.eql('OWNER'); }); }",
+                      "} catch (e) {",
+                      "  pm.test('Error en el script del test: ' + e.message, () => { throw e; });",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "No asistió con token de dueño (403 CLINIC_TOKEN_REQUIRED)",
+              "request": {
+                "method": "PATCH",
+                "header": [],
+                "url": "{{baseUrl}}/veterinaries/878208d5-e583-4463-a8f2-9ae806ccffc8/appointments/{{ownerApptId}}/no-show",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{ownerToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "try {",
+                      "pm.test(\"403\", () => { pm.response.to.have.status(403); });",
+                      "pm.test(\"CLINIC_TOKEN_REQUIRED\", () => { pm.expect(pm.response.json().code).to.eql('CLINIC_TOKEN_REQUIRED'); });",
+                      "} catch (e) {",
+                      "  pm.test('Error en el script del test: ' + e.message, () => { throw e; });",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Citas clínica",
+      "description": "Requiere clinicToken (carpeta 0.4) y que el servidor tenga SIM_CLINIC_USER_ID = sub del empleado. Sin eso, la agenda responde 403.",
+      "auth": {
+        "type": "bearer",
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{clinicToken}}",
+            "type": "string"
+          }
+        ]
+      },
+      "item": [
+        {
+          "name": "Crear cita",
+          "item": [
+            {
+              "name": "Crear cita confirmada (201, CONFIRMED, origen CLINIC)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{baseUrl}}/veterinaries/878208d5-e583-4463-a8f2-9ae806ccffc8/appointments",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{clinicToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"serviceId\": \"f0cbc578-a78e-4162-9347-6c338d233b8b\",\n  \"petId\": \"a259a6ab-66d3-428f-b815-dc314e01c8ff\",\n  \"employeeId\": \"bb1f605e-7fee-41f9-91ac-8a4d19a5a4f8\",\n  \"startsAt\": \"2026-12-07T16:00:00.000Z\",\n  \"notes\": \"Vacuna anual\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "try {",
+                      "pm.test(\"201 Created\", () => { pm.response.to.have.status(201); });",
+                      "pm.test(\"CONFIRMED y origen CLINIC\", () => { const b = pm.response.json(); pm.expect(b.status).to.eql('CONFIRMED'); pm.expect(b.origin).to.eql('CLINIC'); });",
+                      "} catch (e) {",
+                      "  pm.test('Error en el script del test: ' + e.message, () => { throw e; });",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Token de otra clínica (403 TENANT_MISMATCH)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{baseUrl}}/veterinaries/22222222-2222-4222-8222-222222222299/appointments",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{clinicToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"serviceId\": \"f0cbc578-a78e-4162-9347-6c338d233b8b\",\n  \"petId\": \"a259a6ab-66d3-428f-b815-dc314e01c8ff\",\n  \"employeeId\": \"bb1f605e-7fee-41f9-91ac-8a4d19a5a4f8\",\n  \"startsAt\": \"2026-12-07T16:00:00.000Z\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "try {",
+                      "pm.test(\"403\", () => { pm.response.to.have.status(403); });",
+                      "pm.test(\"TENANT_MISMATCH\", () => { pm.expect(pm.response.json().code).to.eql('TENANT_MISMATCH'); });",
+                      "} catch (e) {",
+                      "  pm.test('Error en el script del test: ' + e.message, () => { throw e; });",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Token de dueño en ruta de clínica (403 CLINIC_TOKEN_REQUIRED)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{baseUrl}}/veterinaries/878208d5-e583-4463-a8f2-9ae806ccffc8/appointments",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{ownerToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"serviceId\": \"f0cbc578-a78e-4162-9347-6c338d233b8b\",\n  \"petId\": \"a259a6ab-66d3-428f-b815-dc314e01c8ff\",\n  \"employeeId\": \"bb1f605e-7fee-41f9-91ac-8a4d19a5a4f8\",\n  \"startsAt\": \"2026-12-07T16:00:00.000Z\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "try {",
+                      "pm.test(\"403\", () => { pm.response.to.have.status(403); });",
+                      "pm.test(\"CLINIC_TOKEN_REQUIRED\", () => { pm.expect(pm.response.json().code).to.eql('CLINIC_TOKEN_REQUIRED'); });",
+                      "} catch (e) {",
+                      "  pm.test('Error en el script del test: ' + e.message, () => { throw e; });",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Sin token (401)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{baseUrl}}/veterinaries/878208d5-e583-4463-a8f2-9ae806ccffc8/appointments",
+                "auth": {
+                  "type": "noauth"
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"serviceId\": \"f0cbc578-a78e-4162-9347-6c338d233b8b\",\n  \"petId\": \"a259a6ab-66d3-428f-b815-dc314e01c8ff\",\n  \"employeeId\": \"bb1f605e-7fee-41f9-91ac-8a4d19a5a4f8\",\n  \"startsAt\": \"2026-12-07T16:00:00.000Z\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "try {",
+                      "pm.test(\"401\", () => { pm.response.to.have.status(401); });",
+                      "} catch (e) {",
+                      "  pm.test('Error en el script del test: ' + e.message, () => { throw e; });",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Cuerpo sin employeeId (400 VALIDATION_ERROR)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{baseUrl}}/veterinaries/878208d5-e583-4463-a8f2-9ae806ccffc8/appointments",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{clinicToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"serviceId\": \"f0cbc578-a78e-4162-9347-6c338d233b8b\",\n  \"petId\": \"a259a6ab-66d3-428f-b815-dc314e01c8ff\",\n  \"startsAt\": \"2026-12-07T16:00:00.000Z\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "try {",
+                      "pm.test(\"400\", () => { pm.response.to.have.status(400); });",
+                      "pm.test(\"VALIDATION_ERROR\", () => { pm.expect(pm.response.json().code).to.eql('VALIDATION_ERROR'); });",
+                      "} catch (e) {",
+                      "  pm.test('Error en el script del test: ' + e.message, () => { throw e; });",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Agenda y acciones",
+          "item": [
+            {
+              "name": "Agenda del día (200)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/veterinaries/878208d5-e583-4463-a8f2-9ae806ccffc8/appointments?from=2026-12-07T00:00:00.000Z&to=2026-12-08T00:00:00.000Z",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{clinicToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "try {",
+                      "pm.test(\"200 OK\", () => { pm.response.to.have.status(200); });",
+                      "const list = pm.response.json().appointments;",
+                      "pm.test(\"Arreglo\", () => { pm.expect(list).to.be.an('array'); });",
+                      "pm.test(\"Cada cita trae el nombre de la mascota\", () => { list.forEach((a) => pm.expect(a.petName).to.be.a('string')); });",
+                      "const pick = list.find((a) => a.status === 'REQUESTED') || list.find((a) => a.status === 'CONFIRMED');",
+                      "if (pick) { pm.collectionVariables.set('apptId', pick.id); }",
+                      "pm.test(\"Hay una cita para probar acciones\", () => { pm.expect(pick, 'agenda vacía').to.exist; });",
+                      "} catch (e) {",
+                      "  pm.test('Error en el script del test: ' + e.message, () => { throw e; });",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Confirmar (200 o 409 si ya estaba confirmada)",
+              "request": {
+                "method": "PATCH",
+                "header": [],
+                "url": "{{baseUrl}}/veterinaries/878208d5-e583-4463-a8f2-9ae806ccffc8/appointments/{{apptId}}/confirm",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{clinicToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "try {",
+                      "pm.test(\"200 o 409\", () => { pm.expect([200, 409]).to.include(pm.response.code); });",
+                      "if (pm.response.code === 200) { pm.test('CONFIRMED', () => pm.expect(pm.response.json().status).to.eql('CONFIRMED')); }",
+                      "} catch (e) {",
+                      "  pm.test('Error en el script del test: ' + e.message, () => { throw e; });",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Rechazar sin motivo (400 VALIDATION_ERROR)",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{baseUrl}}/veterinaries/878208d5-e583-4463-a8f2-9ae806ccffc8/appointments/{{apptId}}/reject",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{clinicToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "try {",
+                      "pm.test(\"400\", () => { pm.response.to.have.status(400); });",
+                      "pm.test(\"VALIDATION_ERROR\", () => { pm.expect(pm.response.json().code).to.eql('VALIDATION_ERROR'); });",
+                      "} catch (e) {",
+                      "  pm.test('Error en el script del test: ' + e.message, () => { throw e; });",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Check-in (200 o 409 si no estaba confirmada)",
+              "request": {
+                "method": "PATCH",
+                "header": [],
+                "url": "{{baseUrl}}/veterinaries/878208d5-e583-4463-a8f2-9ae806ccffc8/appointments/{{apptId}}/check-in",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{clinicToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "try {",
+                      "pm.test(\"200 o 409\", () => { pm.expect([200, 409]).to.include(pm.response.code); });",
+                      "} catch (e) {",
+                      "  pm.test('Error en el script del test: ' + e.message, () => { throw e; });",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Acción desconocida (404 ACTION_NOT_FOUND)",
+              "request": {
+                "method": "PATCH",
+                "header": [],
+                "url": "{{baseUrl}}/veterinaries/878208d5-e583-4463-a8f2-9ae806ccffc8/appointments/{{apptId}}/volar",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{clinicToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "try {",
+                      "pm.test(\"404\", () => { pm.response.to.have.status(404); });",
+                      "pm.test(\"ACTION_NOT_FOUND\", () => { pm.expect(pm.response.json().code).to.eql('ACTION_NOT_FOUND'); });",
+                      "} catch (e) {",
+                      "  pm.test('Error en el script del test: ' + e.message, () => { throw e; });",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4. Recordatorios",
+      "description": "Chequeo de recordatorios de eventos (público). El job interno de citas solo se prueba desde el servidor, con su clave.",
+      "auth": {
+        "type": "noauth"
+      },
+      "item": [
+        {
+          "name": "Eventos",
+          "item": [
+            {
+              "name": "Chequear recordatorios de eventos",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/calendar-events/reminders/check"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "try {",
+                      "pm.test(\"200 OK\", () => { pm.response.to.have.status(200); });",
+                      "pm.test(\"Keys checked, notified, failed\", () => { pm.expect(pm.response.json()).to.have.all.keys('checked', 'notified', 'failed'); });",
+                      "} catch (e) {",
+                      "  pm.test('Error en el script del test: ' + e.message, () => { throw e; });",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Job de citas",
+          "item": [
+            {
+              "name": "Job de citas sin clave interna (401 INVALID_INTERNAL_KEY)",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "url": "{{baseUrl}}/internal/jobs/appointments/reminders"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "try {",
+                      "pm.test(\"401\", () => { pm.response.to.have.status(401); });",
+                      "pm.test(\"INVALID_INTERNAL_KEY\", () => { pm.expect(pm.response.json().code).to.eql('INVALID_INTERNAL_KEY'); });",
+                      "} catch (e) {",
+                      "  pm.test('Error en el script del test: ' + e.message, () => { throw e; });",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

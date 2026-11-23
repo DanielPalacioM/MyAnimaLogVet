@@ -1,6 +1,6 @@
 # Avance de la parte Vet: qué funciona, qué no y por qué
 
-Al 17 de noviembre de 2026. Cruza las pantallas de Figma (`MYANIMALOG_VET_ESTADO.md`, `MODULO_MEDICO.md`), el Maestro, las dos colecciones de Postman
+Al 22 de noviembre de 2026 (el cuadro de rutas y brechas actualizado está en `ESTADO_RUTAS_Y_BRECHAS.md`). Cruza las pantallas de Figma (`MYANIMALOG_VET_ESTADO.md`, `MODULO_MEDICO.md`), el Maestro, las dos colecciones de Postman
 (`MyAnimaLogVet…(1)` con 69 endpoints de veterinary-service y `Medical Pet Backend · Dueño y Veterinaria` con 83 de Medical) y el código del panel.
 
 Leyenda: ✅ conectado al backend real · 🟡 conectado, falta probar con datos reales · ⛔ pantalla hecha pero **sin endpoint** · ⬜ sin pantalla.
@@ -24,8 +24,8 @@ La colección nueva de Medical trae **los mismos 83 endpoints** que la anterior 
 | Historia clínica · Peso con gráfica (clínica vs dueño) | 🟡 | Hay lista con cambio; falta la gráfica |
 | Inicio (saludo, plan, pendientes) | 🟡 | Saludo, plan e invitaciones del equipo sí; **citas de hoy, solicitudes y vacunas vencidas** no |
 | Agenda (día por profesional, semana, detalle de la cita, nueva cita, solicitudes, reprogramar) | 🟡 | Conectada al calendar-service (colección "Calendar Microservice"): estados, servicio y duración vienen de la cita. Calendar es un servicio aparte en Cloud Run (las rutas existen, piden token); **falta CORS para el panel desplegado** y el endpoint de disponibilidad. Ver `ADAPTACION_ENDPOINTS_VET.md` §6 |
-| Pacientes (lista, ficha, agregar paciente, por reclamar, acceso revocado) | ⛔ | No hay lista de mascotas compartidas con la clínica |
-| Clientes (lista, ficha, quitar cliente) | ⛔ | No hay lista de dueños vinculados. "Mostrar código QR" sí funciona |
+| Pacientes (lista, ficha, agregar paciente, por reclamar, acceso revocado) | 🟡 | La lista y la ficha leen `GET /{id}/patients` (conectado). Falta registrar paciente sin app y la invitación para reclamar |
+| Clientes (lista, ficha, quitar cliente) | 🟡 | Conectado a `GET /{id}/clients` y `DELETE /{id}/clients/{userId}`; "Mostrar código QR" funciona |
 | Servicios y horarios (catálogo, horario, bloqueos) | 🟡 | Catálogo, horario de atención y bloqueos conectados (sin probar con token). Falta el horario por profesional |
 | Reportes | ⬜ | Solo "Pronto"; depende de citas, pacientes y servicios |
 

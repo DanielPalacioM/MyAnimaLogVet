@@ -1,7 +1,7 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { SessionService } from '@auth/services/session.service';
 import { ClinicContextService } from '@auth/services/clinic-context.service';
-import { catchError, EMPTY, expand, forkJoin, from, map, mergeMap, Observable, of, reduce, switchMap, tap } from 'rxjs';
+import { catchError, EMPTY, expand, forkJoin, from, map, mergeMap, Observable, of, reduce, switchMap, tap, throwError } from 'rxjs';
 import { ApiError } from '../api-error';
 import { ClinicProfileDto, SubscriptionDto } from '../api/api.models';
 import { AppointmentAction, AppointmentDto, CalendarApi } from '../api/calendar.api';
@@ -44,7 +44,7 @@ import {
   Professional,
   ScheduleDay,
 } from './clinic.models';
-import { FEATURES } from '../features';
+import { FEATURE_MESSAGE, FEATURES } from '../features';
 import { addDays, at, sameDay, startOfDay } from './date.utils';
 
 const DAY = 86_400_000;
@@ -207,8 +207,9 @@ export class ClinicStore {
     this.loadTeam().subscribe();
     this.loadLinkCode().subscribe();
     this.loadPeople().subscribe();
-    // Catálogo y horario aún no existen en el backend (VET-31/32): con la función apagada no se hace la llamada.
-    if (FEATURES.catalog) this.loadCatalog().subscribe();
+    // Catálogo: se leen los servicios reservables de Calendar (el CRUD, VET-31, aún no existe).
+    this.loadCatalog().subscribe();
+    // Horario y bloqueos (VET-32) aún no existen en el backend: con la función apagada no se hace la llamada.
     if (FEATURES.schedule) this.loadSchedule().subscribe();
     const today = startOfDay(Date.now());
     this.loadAppointments(today, addDays(today, UPCOMING_DAYS)).subscribe();
@@ -219,7 +220,7 @@ export class ClinicStore {
     const id = this.clinicId;
     if (!id) return EMPTY;
     this.catalogState.set('loading');
-    return this.catalogApi.list(id).pipe(
+    return (FEATURES.catalog ? this.catalogApi.list(id) : this.catalogApi.bookable(id)).pipe(
       tap((list) => {
         this.catalog.set(list.map(serviceFrom));
         this.catalogState.set('ready');
@@ -651,6 +652,7 @@ export class ClinicStore {
   addService(input: Omit<ClinicService, 'id' | 'active'>): Observable<void> {
     const id = this.clinicId;
     if (!id) return EMPTY;
+    if (!FEATURES.catalog) return throwError(() => new ApiError('NOT_AVAILABLE', FEATURE_MESSAGE.catalog));
     return this.catalogApi.create(id, serviceBody(input)).pipe(switchMap(() => this.loadCatalog()));
   }
 
@@ -658,6 +660,7 @@ export class ClinicStore {
   updateService(serviceId: string, patch: Partial<ClinicService>): Observable<void> {
     const id = this.clinicId;
     if (!id) return EMPTY;
+    if (!FEATURES.catalog) return throwError(() => new ApiError('NOT_AVAILABLE', FEATURE_MESSAGE.catalog));
     const current = this.catalog().find((s) => s.id === serviceId);
     if (patch.active === false) {
       return this.catalogApi.deactivate(id, serviceId).pipe(switchMap(() => this.loadCatalog()));

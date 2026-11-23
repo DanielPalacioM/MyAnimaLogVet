@@ -4,7 +4,6 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { startWith } from 'rxjs';
 import { errorMessage } from '@services/api-error';
-import { FEATURES } from '@services/features';
 import { Appointment } from '@services/clinic/clinic.models';
 import { ClinicStore } from '@services/clinic/clinic.store';
 import { at, isoDate, startOfDay } from '@services/clinic/date.utils';
@@ -107,8 +106,8 @@ export class NewAppointmentDialog {
 
   /** Sin servicios o sin pacientes no hay nada que agendar: se explica en vez de abrir un formulario roto. */
   protected readonly blocker = computed(() => {
-    if (!FEATURES.catalog) return 'El catálogo de servicios todavía no está disponible en el backend, así que por ahora las citas se agendan desde la app del dueño y aquí se gestionan.';
-    if (!this.store.services.length) return 'Primero crea al menos un servicio activo en “Servicios y horarios”.';
+    if (this.store.catalogState() === 'error') return 'No pudimos cargar los servicios de la clínica. Cierra e inténtalo de nuevo.';
+    if (!this.store.services.length) return 'La clínica no tiene servicios reservables en línea. Agrega uno en “Servicios y horarios” cuando el catálogo esté disponible.';
     if (!this.store.patients().length && !this.reschedule) return 'Todavía no hay pacientes: aparecen cuando un dueño comparte su mascota con la clínica.';
     if (!this.store.professionals.length) return 'No hay profesionales activos en el equipo.';
     return '';
