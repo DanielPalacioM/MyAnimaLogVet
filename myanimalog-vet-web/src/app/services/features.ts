@@ -9,7 +9,7 @@ export const FEATURES = environment.features;
 export type FeatureName = keyof typeof FEATURES;
 
 export const FEATURE_MESSAGE: Record<FeatureName, string> = {
-  patients: 'La lista muestra las mascotas que los dueños comparten desde su app. Registrar pacientes sin app y enviar invitaciones para reclamar estará disponible pronto.',
+  patients: 'Registrar pacientes sin app todavía no está publicado en el backend (no aparece en la colección de Veterinary): estará disponible pronto.',
   appointments: 'La agenda se conecta con el servicio de citas: estará disponible pronto.',
   catalog: 'Crear y editar servicios aún no está publicado en el backend (VET-31): por ahora se ven los servicios reservables en línea.',
   schedule: 'El horario de atención y los bloqueos aún no están publicados en el backend (VET-32): estarán disponibles pronto.',

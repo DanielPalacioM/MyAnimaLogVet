@@ -7,7 +7,7 @@ import { ClinicProfileDto, SubscriptionDto } from '../api/api.models';
 import { AppointmentAction, AppointmentDto, CalendarApi } from '../api/calendar.api';
 import { CatalogApi, ServiceBody } from '../api/catalog.api';
 import { ClinicApi } from '../api/clinic.api';
-import { ScheduleApi } from '../api/schedule.api';
+import { BLOCKS_MAX_DAYS, ScheduleApi } from '../api/schedule.api';
 import { ClientDto, LinkApi, PageDto, PatientDto } from '../api/link.api';
 import {
   appointmentFrom,
@@ -19,6 +19,7 @@ import {
   invitationFrom,
   memberFrom,
   patientBodyFrom,
+  serviceRoleToApi,
   patientFrom,
   profileFrom,
   roleFromApi,
@@ -291,7 +292,7 @@ export class ClinicStore {
         const before = new Map(this.patients().map((p) => [p.id, p]));
         this.patients.set(
           patients.map((dto) => {
-            const base = patientFrom(dto, owners.get(dto.ownerUserId) ?? 'Sin nombre');
+            const base = patientFrom(dto, (dto.ownerUserId ? owners.get(dto.ownerUserId) : undefined) ?? 'Sin nombre');
             const old = before.get(dto.petId);
             return old?.birthDate ? { ...base, age: old.age, sex: old.sex, birthDate: old.birthDate } : base;
           }),
@@ -630,13 +631,22 @@ export class ClinicStore {
    * Registra una mascota **sin app** y manda la invitación al dueño para que la reclame. Se guarda en el servidor y se
    * recarga la lista: nada queda solo en la pantalla. Sin la ruta publicada (flag `patients`) falla con un aviso claro.
    */
-  registerPatient(input: NewPatient): Observable<{ invitedEmail: string | null }> {
+  registerPatient(input: NewPatient): Observable<{ invitedEmail: string }> {
     const id = this.clinicId;
     if (!id) return EMPTY;
     if (!FEATURES.patients) return throwError(() => new ApiError('NOT_AVAILABLE', FEATURE_MESSAGE.patients));
     return this.linkApi.registerPatient(id, patientBodyFrom(input)).pipe(
-      switchMap((res) => this.loadPeople().pipe(map(() => ({ invitedEmail: res.claimInvitation?.email ?? input.ownerEmail })))),
+      switchMap((res) =>
+        this.loadPeople().pipe(map(() => ({ invitedEmail: res?.claimInvitation?.email ?? res?.invitationEmail ?? input.ownerEmail.trim().toLowerCase() }))),
+      ),
     );
+  }
+
+  /** "Reenviar invitación" de una mascota sin reclamar. Devuelve el correo al que se mandó, si el servidor lo dice. */
+  resendClaimInvitation(petId: string): Observable<string | null> {
+    const id = this.clinicId;
+    if (!id) return EMPTY;
+    return this.linkApi.resendClaimInvitation(id, petId).pipe(map((res) => res?.invitationEmail ?? null));
   }
 
   /**
@@ -690,9 +700,15 @@ export class ClinicStore {
     const id = this.clinicId;
     if (!id) return EMPTY;
     const from = startOfDay(Date.now());
+    const end = addDays(from, 365);
+    // El servidor acepta máximo 92 días por consulta: el año se pide en tramos y se quitan los repetidos.
+    const windows = Array.from({ length: Math.ceil(365 / BLOCKS_MAX_DAYS) }, (_, i) => addDays(from, i * BLOCKS_MAX_DAYS));
+    const blocks$ = forkJoin(windows.map((start) => this.scheduleApi.blocks(id, start, Math.min(addDays(start, BLOCKS_MAX_DAYS), end)))).pipe(
+      map((parts) => [...new Map(parts.flat().map((b) => [b.id, b])).values()]),
+    );
     return forkJoin({
       hours: this.scheduleApi.businessHours(id),
-      blocks: this.scheduleApi.blocks(id, from, addDays(from, 365)),
+      blocks: blocks$,
     }).pipe(
       tap(({ hours, blocks }) => {
         if (this.clinicId !== id) return;
@@ -724,19 +740,37 @@ export class ClinicStore {
     return this.scheduleApi.deleteBlock(id, blockId).pipe(switchMap(() => this.loadSchedule()));
   }
 
+  /** Horario propio de un empleado. `null`: usa el de la clínica. */
+  memberSchedule(employeeId: string): Observable<ScheduleDay[] | null> {
+    const id = this.clinicId;
+    if (!id) return EMPTY;
+    return this.scheduleApi.employeeSchedule(id, employeeId).pipe(map((r) => (r.usesClinicHours ? null : scheduleFrom(r.items))));
+  }
+
+  /** Guarda el horario propio; `null` lo devuelve al de la clínica. */
+  saveMemberSchedule(employeeId: string, days: ScheduleDay[] | null): Observable<void> {
+    const id = this.clinicId;
+    if (!id) return EMPTY;
+    return this.scheduleApi.replaceEmployeeSchedule(id, employeeId, days ? scheduleToApi(days) : []).pipe(map(() => undefined));
+  }
+
   setMemberSchedule(memberId: string, schedule: string): void {
     this.members.update((list) => list.map((m) => (m.id === memberId ? { ...m, schedule } : m)));
   }
 }
 
-function serviceBody(s: Pick<ClinicService, 'name' | 'category' | 'minutes' | 'price' | 'online' | 'professionalIds'>): ServiceBody {
+const DEFAULT_SERVICE_ROLES: MemberRole[] = ['OWNER', 'ADMIN', 'VET'];
+
+function serviceBody(s: Pick<ClinicService, 'name' | 'category' | 'minutes' | 'price' | 'online' | 'allowedRoles' | 'requiresLicense'>): ServiceBody {
+  const roles = s.allowedRoles?.length ? s.allowedRoles : DEFAULT_SERVICE_ROLES;
   return {
     name: s.name.trim(),
     category: categoryToApi(s.category),
     durationMinutes: s.minutes,
     price: s.price,
     bookableOnline: s.online,
-    employeeIds: s.professionalIds,
+    requiresLicense: !!s.requiresLicense,
+    allowedRoles: [...new Set(roles.map(serviceRoleToApi))],
   };
 }
 

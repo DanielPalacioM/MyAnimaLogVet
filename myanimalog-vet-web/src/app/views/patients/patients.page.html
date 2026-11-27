@@ -120,7 +120,7 @@
       @if (p.inApp) {
         <p class="ss-share" style="margin: 0"><vet-icon name="shield" [size]="14" />Comparte la historia de {{ p.name }} con la clínica</p>
       } @else {
-        <button type="button" class="ss-link" (click)="claimLink(p.owner)">Enviar enlace para reclamar</button>
+        <button type="button" class="ss-link" (click)="claimLink(p)">Reenviar invitación para reclamar</button>
       }
       <ng-container footer>
         <button type="button" class="ss-primary" (click)="openHistory(p.id, true)"><vet-icon name="plus" [size]="16" />Registrar visita</button>
@@ -129,7 +129,7 @@
         </div>
         <div class="ss-two">
           <button type="button" (click)="newAppointment(p.id)">Nueva cita</button>
-          <button type="button" (click)="uploadDoc()">Subir documento</button>
+          <button type="button" (click)="uploadDoc(p.id)">Subir documento</button>
         </div>
         <p class="ss-hint">Solo veterinarios con tarjeta verificada pueden registrar visitas.</p>
       </ng-container>

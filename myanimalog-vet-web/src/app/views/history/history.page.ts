@@ -4,11 +4,12 @@ import { ActivatedRoute } from '@angular/router';
 import { MatDialog, MatDialogConfig } from '@angular/material/dialog';
 import { SessionService } from '@auth/services/session.service';
 import { errorMessage } from '@services/api-error';
-import { AllergyEntry, AllergyList, ClinicalSummary, DewormingStatus, DewormingType, LabEntry, MedicalApi, SurgeryEntry, TreatmentEntry, VaccineEntry, Visit, WeightEntry } from '@services/api/medical.api';
+import { AllergyEntry, AllergyList, ClinicalSummary, DewormingStatus, DewormingType, DOCUMENT_TYPES, DocumentEntry, LabEntry, MedicalApi, SurgeryEntry, TreatmentEntry, VaccineEntry, Visit, WeightEntry } from '@services/api/medical.api';
 import { ClinicStore } from '@services/clinic/clinic.store';
 import { PanelActionsService } from '@services/panel/panel-actions.service';
 import { Observable } from 'rxjs';
 import { RecordData, RecordDialog, RecordKind } from './record.dialog';
+import { DocumentDialog, DocumentDialogData } from './document.dialog';
 
 export type HistoryTab = 'summary' | 'visits' | 'vaccines' | 'deworming' | 'allergies' | 'weight' | 'treatments' | 'surgeries' | 'labs' | 'documents';
 export type Origin = 'clinic' | 'other' | 'owner';
@@ -53,6 +54,7 @@ export class HistoryPage implements OnInit {
 
   protected readonly summary = signal<Part<ClinicalSummary | null>>(empty(null));
   protected readonly visits = signal<Part<Visit[]>>(empty([]));
+  protected readonly documents = signal<Part<DocumentEntry[]>>(empty([]));
   protected readonly vaccines = signal<Part<VaccineEntry[]>>(empty([]));
   protected readonly weights = signal<Part<WeightEntry[]>>(empty([]));
   protected readonly allergies = signal<Part<AllergyList>>(empty({ status: 'UNKNOWN', items: [] }));
@@ -95,7 +97,7 @@ export class HistoryPage implements OnInit {
       { value: 'surgeries', label: 'Cirugías', count: this.surgeries().data.length },
       { value: 'labs', label: 'Laboratorio', count: this.labs().data.length },
       { value: 'weight', label: 'Peso', count: this.allWeights().length },
-      { value: 'documents', label: 'Documentos', count: null },
+      { value: 'documents', label: 'Documentos', count: this.documents().data.length },
     ];
     return this.basicOnly() ? all.slice(0, 1) : all;
   });
@@ -480,8 +482,64 @@ export class HistoryPage implements OnInit {
     this.actions.newAppointment({ patientId: this.petId });
   }
 
-  protected uploadDoc(): void {
-    this.actions.toast('Subir documentos estará disponible pronto');
+  /** Sube un documento (Medical V8). Sin permiso de escritura no se ofrece. */
+  protected uploadDoc(visitId?: string): void {
+    if (!this.canNursing()) {
+      this.actions.toast('Tu rol no puede subir documentos a la historia.');
+      return;
+    }
+    const data: DocumentDialogData = { petId: this.petId, visits: this.visits().data, visitId };
+    this.dialog
+      .open<DocumentDialog, DocumentDialogData, boolean>(DocumentDialog, { ...MODAL, data })
+      .afterClosed()
+      .subscribe((saved) => {
+        if (!saved) return;
+        this.actions.toast('Documento subido');
+        this.load(this.documents, this.api.documents(this.petId));
+      });
+  }
+
+  /** Abre el archivo con la URL firmada (vence a los 10 minutos, por eso se pide al momento). */
+  protected openDoc(d: DocumentEntry): void {
+    const win = window.open('', '_blank');
+    this.api.document(d.id).subscribe({
+      next: (full) => {
+        if (full.signedUrl && win) win.location.href = full.signedUrl;
+        else {
+          win?.close();
+          this.actions.toast('El documento no trae un enlace para abrirlo.');
+        }
+      },
+      error: (e: unknown) => {
+        win?.close();
+        this.actions.toast(errorMessage(e, 'No pudimos abrir el documento.'));
+      },
+    });
+  }
+
+  protected deleteDoc(d: DocumentEntry): void {
+    if (!confirm(`¿Borrar "${d.title || d.fileName}"? No se puede deshacer.`)) return;
+    this.api.deleteDocument(d.id).subscribe({
+      next: () => {
+        this.documents.update((p) => ({ ...p, data: p.data.filter((x) => x.id !== d.id) }));
+        this.actions.toast('Documento borrado');
+      },
+      error: (e: unknown) => this.actions.toast(errorMessage(e, 'Solo la clínica que lo subió puede borrarlo.')),
+    });
+  }
+
+  protected docType(value: string): string {
+    return DOCUMENT_TYPES.find((t) => t.value === value)?.label ?? (value ? value.charAt(0) + value.slice(1).toLowerCase().replace(/_/g, ' ') : 'Documento');
+  }
+
+  protected docSize(bytes: number | null): string {
+    if (bytes == null) return '';
+    return bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / 1024 / 1024).toFixed(1).replace('.', ',')} MB`;
+  }
+
+  /** Documentos ligados a una consulta (p. ej. los de una cirugía). */
+  protected docsOfVisit(visitId: string): DocumentEntry[] {
+    return visitId ? this.documents().data.filter((d) => d.visitId === visitId) : [];
   }
 
   ngOnInit(): void {
@@ -495,10 +553,18 @@ export class HistoryPage implements OnInit {
     this.load(this.vaccines, this.api.vaccines(this.petId));
     this.load(this.weights, this.api.weights(this.petId));
     this.load(this.surgeries, this.api.surgeries(this.petId));
+    this.load(this.documents, this.api.documents(this.petId));
     // Desde la ficha del paciente, "Registrar visita" llega con `?nueva=visita`: se abre el formulario una sola vez.
-    if (!this.visitFormOpened && this.route.snapshot.queryParamMap.get('nueva') === 'visita' && this.canWriteClinical()) {
+    const nueva = this.route.snapshot.queryParamMap.get('nueva');
+    if (!this.visitFormOpened && nueva === 'visita' && this.canWriteClinical()) {
       this.visitFormOpened = true;
       setTimeout(() => this.add('visit'));
+    }
+    // Desde la ficha del paciente, "Subir documento" llega con `?nueva=documento`.
+    if (!this.visitFormOpened && nueva === 'documento' && this.canNursing()) {
+      this.visitFormOpened = true;
+      this.tab.set('documents');
+      setTimeout(() => this.uploadDoc());
     }
   }
 

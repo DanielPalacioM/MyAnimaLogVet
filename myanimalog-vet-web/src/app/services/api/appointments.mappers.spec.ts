@@ -123,14 +123,33 @@ describe('mappers de horario y bloqueos', () => {
   });
 });
 
-describe('patientBodyFrom (registrar sin app)', () => {
-  it('arma el cuerpo con especie en inglés, correo en minúsculas y sin campos vacíos', async () => {
+describe('registrar sin app (walk-in)', () => {
+  it('arma el cuerpo del contrato: mascota, dueño con teléfono internacional e invitación', async () => {
     const { patientBodyFrom } = await import('./mappers');
-    expect(patientBodyFrom({ name: ' Max ', species: 'Perro', breed: 'Criollo', ownerName: 'Carlos Pérez', ownerEmail: ' Carlos@Correo.COM ' })).toEqual({
-      name: 'Max', species: 'DOG', breed: 'Criollo', owner: { fullName: 'Carlos Pérez', email: 'carlos@correo.com' },
+    expect(patientBodyFrom({ name: ' Max ', species: 'Perro', breed: 'Criollo', ownerName: 'Carlos Pérez', ownerEmail: ' Carlos@Correo.COM ', ownerDocumentType: 'CC', ownerDocumentNumber: ' 1047123456 ' })).toEqual({
+      pet: { name: 'Max', species: 'DOG', breed: 'Criollo' },
+      owner: { fullName: 'Carlos Pérez', email: 'carlos@correo.com', documentType: 'CC', documentNumber: '1047123456' },
+      sendClaimInvitation: true,
     });
-    expect(patientBodyFrom({ name: 'Mia', species: 'Gato', breed: 'Siamés', sex: 'Hembra', birthDate: '2024-05-01', ownerName: 'Ana Ruiz', ownerEmail: 'a@b.co', ownerPhone: '3001234567' })).toEqual({
-      name: 'Mia', species: 'CAT', breed: 'Siamés', sex: 'FEMALE', birthDate: '2024-05-01', owner: { fullName: 'Ana Ruiz', email: 'a@b.co', phone: '3001234567' },
+    expect(patientBodyFrom({ name: 'Mia', species: 'Gato', breed: 'Siamés', sex: 'Hembra', birthDate: '2024-05-01', ownerName: 'Ana Ruiz', ownerEmail: 'a@b.co', ownerPhone: '300 123 4567', ownerDocumentType: 'CE', ownerDocumentNumber: '998877' })).toEqual({
+      pet: { name: 'Mia', species: 'CAT', breed: 'Siamés', sex: 'FEMALE', birthDate: '2024-05-01' },
+      owner: { fullName: 'Ana Ruiz', email: 'a@b.co', phone: '+573001234567', documentType: 'CE', documentNumber: '998877' },
+      sendClaimInvitation: true,
     });
+  });
+
+  it('una mascota sin dueño en la app queda "Por reclamar" y muestra el contacto que dejó la clínica', () => {
+    const p = patientFrom({ petId: 'p9', name: 'Max', species: 'DOG', breed: null, photoUrl: null, ownerUserId: null, grantedAt: '2026-11-23T10:00:00', claimStatus: 'UNCLAIMED', ownerContact: { fullName: 'Carlos Pérez', email: 'c@x.co', phone: '+573001234567' } }, 'Sin nombre');
+    expect(p.inApp).toBeFalse();
+    expect(p.owner).toBe('Carlos Pérez');
+    expect(p.phone).toBe('+573001234567');
+  });
+
+  it('si no trae contacto, muestra el correo de la invitación; una mascota con dueño sigue "Conectada"', () => {
+    const sin = patientFrom({ petId: 'p9', name: 'Max', species: 'DOG', breed: null, photoUrl: null, ownerUserId: null, grantedAt: '', claim: { status: 'UNCLAIMED', invitationEmail: 'c@x.co' } }, 'Sin nombre');
+    expect(sin.owner).toBe('c@x.co');
+    const con = patientFrom({ petId: 'p1', name: 'Leo', species: 'DOG', breed: null, photoUrl: null, ownerUserId: 'u1', grantedAt: '' }, 'Carlos');
+    expect(con.inApp).toBeTrue();
+    expect(con.owner).toBe('Carlos');
   });
 });

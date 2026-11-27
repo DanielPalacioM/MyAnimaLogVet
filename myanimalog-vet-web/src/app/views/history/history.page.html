@@ -413,8 +413,14 @@
                 }
               </article>
               <article class="card card--flush">
-                <div class="card__head"><h2>Documentos</h2></div>
-                <p class="empty">Los documentos de la cirugía estarán disponibles pronto.</p>
+                <div class="card__head">
+                  <h2>Documentos</h2>
+                  <span class="grow"></span>
+                  @if (canNursing()) { <button type="button" class="vet-btn vet-btn--secondary vet-btn--sm" (click)="uploadDoc(selectedSurgery().visitId)">Subir</button> }
+                </div>
+                @for (d of docsOfVisit(selectedSurgery().visitId); track d.id) {
+                  <button type="button" class="li" (click)="openDoc(d)"><strong>{{ d.title || d.fileName }}</strong><small>{{ docType(d.type) }} · {{ day(d.createdAt) }}</small></button>
+                } @empty { <p class="empty">Sin documentos de esta cirugía (consentimiento, protocolo anestésico…).</p> }
               </article>
             </div>
           </div>
@@ -647,11 +653,33 @@
       }
     }
 
-    <!-- ───────── Documentos (2026:225): GET /documents no está publicado en el gateway -->
+    <!-- ───────── Documentos (2026:225): Medical V8, GET/POST/DELETE /documents -->
     @case ('documents') {
-      <article class="card">
-        <h2>Documentos</h2>
-        <p class="muted">Los documentos de la historia (resultados, consentimientos, recetas) estarán disponibles cuando el backend publique su consulta.</p>
+      <article class="card card--flush">
+        <div class="card__head">
+          <h2>Documentos <span class="count">{{ documents().data.length }}</span></h2>
+          <span class="grow"></span>
+          @if (canNursing()) { <button type="button" class="vet-btn vet-btn--primary vet-btn--sm" (click)="uploadDoc()"><vet-icon name="plus" [size]="16" />Subir documento</button> }
+        </div>
+        @if (documents().loading) {
+          <p class="empty">Cargando documentos…</p>
+        } @else if (documents().error) {
+          <p class="empty">{{ documents().error }}</p>
+        } @else {
+          @for (d of documents().data; track d.id) {
+            <div class="doc">
+              <div class="doc__info">
+                <strong>{{ d.title || d.fileName || 'Documento' }}</strong>
+                <small>{{ docType(d.type) }} · {{ day(d.createdAt) }}@if (d.uploadedBy) { · {{ d.uploadedBy }} }@if (d.sizeBytes != null) { · {{ docSize(d.sizeBytes) }} }</small>
+              </div>
+              <button type="button" class="vet-btn vet-btn--secondary vet-btn--sm" (click)="openDoc(d)">Ver</button>
+              @if (canNursing()) { <button type="button" class="vet-btn vet-btn--secondary vet-btn--sm" (click)="deleteDoc(d)" [attr.aria-label]="'Borrar ' + (d.title || d.fileName)">Borrar</button> }
+            </div>
+          } @empty {
+            <p class="empty">Todavía no hay documentos. Sube resultados, imágenes, consentimientos o fórmulas.</p>
+          }
+        }
+        <p class="foot">Solo la clínica ve estos documentos. Se abren con un enlace que vence a los 10 minutos.</p>
       </article>
     }
   }

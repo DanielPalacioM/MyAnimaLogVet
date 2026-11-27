@@ -17,6 +17,10 @@ export interface ServiceDto {
   bookable_online?: boolean | null;
   employeeIds?: string[] | null;
   professionalIds?: string[] | null;
+  /** Roles que pueden prestarlo (`OWNER`, `ADMIN`, `VETERINARIAN`, `ASSISTANT`, `RECEPTIONIST`). */
+  allowedRoles?: string[] | null;
+  /** Solo lo presta quien tiene tarjeta profesional verificada. */
+  requiresLicense?: boolean | null;
 }
 
 export interface ServiceBody {
@@ -25,7 +29,9 @@ export interface ServiceBody {
   durationMinutes: number;
   price: number;
   bookableOnline: boolean;
-  employeeIds: string[];
+  requiresLicense: boolean;
+  /** Nunca vacío. Veterinary calcula con esto qué empleados lo prestan. */
+  allowedRoles: string[];
 }
 
 /** Catálogo de servicios de la clínica (`/api/veterinary/{id}/services`, token de clínica). Crear y editar: `CLINIC_CONFIGURE`. */
@@ -36,7 +42,7 @@ export class CatalogApi {
 
   /**
    * Servicios **reservables en línea** de la clínica, del calendar-service (`{ services: [{ id, name, durationMinutes, price }] }`).
-   * Es lo único que hay publicado: el CRUD del catálogo (VET-31) aún no existe. Se pide con el token normal (ver `usesNormalToken`).
+   * Se usa solo con `features.catalog` apagado. Se pide con el token normal (ver `usesNormalToken`).
    */
   bookable(veterinaryId: string): Observable<ServiceDto[]> {
     return this.http
@@ -47,7 +53,7 @@ export class CatalogApi {
   list(veterinaryId: string): Observable<ServiceDto[]> {
     return this.http
       .get<ServiceDto[] | { services?: ServiceDto[]; items?: ServiceDto[] }>(this.base(veterinaryId))
-      .pipe(map((res) => (Array.isArray(res) ? res : (res.services ?? res.items ?? []))), mapApiError());
+      .pipe(map((res) => (Array.isArray(res) ? res : (res.items ?? res.services ?? []))), mapApiError());
   }
 
   create(veterinaryId: string, body: ServiceBody): Observable<ServiceDto> {

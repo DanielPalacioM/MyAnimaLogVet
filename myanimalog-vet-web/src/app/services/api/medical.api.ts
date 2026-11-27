@@ -268,6 +268,41 @@ export interface NewTreatment {
   instructions?: string;
 }
 
+/** Tipos de documento de la mascota (`documentType` de `POST /documents`). La colección solo muestra `LABORATORIO`. */
+export const DOCUMENT_TYPES: { value: string; label: string }[] = [
+  { value: 'LABORATORIO', label: 'Laboratorio' },
+  { value: 'IMAGEN_DIAGNOSTICA', label: 'Imagen diagnóstica' },
+  { value: 'CONSENTIMIENTO', label: 'Consentimiento' },
+  { value: 'FORMULA', label: 'Fórmula' },
+  { value: 'CERTIFICADO', label: 'Certificado' },
+  { value: 'VACUNAS', label: 'Vacunas' },
+  { value: 'OTRO', label: 'Otro' },
+];
+
+/** V8. Documento de la mascota (resultado, imagen, consentimiento…). Solo lo ve y lo sube la clínica. */
+export interface DocumentEntry {
+  id: string;
+  petId: string;
+  visitId: string;
+  type: string;
+  title: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number | null;
+  createdAt: string;
+  uploadedBy: string;
+  /** Solo en el detalle: vence a los 10 minutos. */
+  signedUrl: string;
+}
+
+export interface NewDocument {
+  petId: string;
+  file: File;
+  documentType: string;
+  title: string;
+  visitId?: string;
+}
+
 export interface NewMedication {
   name: string;
   dosage: string;
@@ -366,6 +401,20 @@ const toVaccine = (r: Raw): VaccineEntry => ({
   manufacturer: text(r['manufacturer']),
   veterinarian: text(r['veterinarian']),
   notes: text(r['notes']),
+});
+
+const toDocument = (r: Raw): DocumentEntry => ({
+  id: text(r['id']),
+  petId: text(pick(r, 'petId', 'pet_id')),
+  visitId: text(pick(r, 'visitId', 'visit_id', 'veterinaryVisitId')),
+  type: text(pick(r, 'documentType', 'document_type', 'type')),
+  title: text(pick(r, 'title', 'name')),
+  fileName: text(pick(r, 'fileName', 'file_name', 'originalName')),
+  mimeType: text(pick(r, 'mimeType', 'mime_type', 'contentType')),
+  sizeBytes: num(pick(r, 'fileSizeBytes', 'sizeBytes', 'size', 'file_size_bytes')),
+  createdAt: text(pick(r, 'createdAt', 'created_at', 'uploadedAt', 'uploaded_at')),
+  uploadedBy: text(pick(r, 'veterinaryName', 'uploadedByName', 'uploadedBy', 'veterinarian')),
+  signedUrl: text(pick(r, 'signedUrl', 'signed_url', 'url', 'downloadUrl')),
 });
 
 const toMedication = (r: Raw): Medication => ({
@@ -615,6 +664,36 @@ export class MedicalApi {
   /** V4. `CLINICAL_WRITE` + tarjeta. Cuelga de una visita. */
   createTreatment(body: NewTreatment): Observable<TreatmentEntry> {
     return this.http.post<unknown>(`${USER_API}/treatments`, body).pipe(map((r) => toTreatment((unwrap(r) ?? {}) as Raw)), mapApiError());
+  }
+
+  /** V8. Documentos de la mascota (los más nuevos primero). */
+  documents(petId: string): Observable<DocumentEntry[]> {
+    const params = new HttpParams().set('petId', petId);
+    return this.http.get<unknown>(`${USER_API}/documents`, { params }).pipe(
+      map((r) => list(r).map(toDocument).sort((a, b) => b.createdAt.localeCompare(a.createdAt))),
+      mapApiError(),
+    );
+  }
+
+  /** V8. Sube un PDF, JPG o PNG (máx. 10 MB) en multipart. */
+  uploadDocument(d: NewDocument): Observable<DocumentEntry> {
+    const form = new FormData();
+    form.append('file', d.file, d.file.name);
+    form.append('petId', d.petId);
+    form.append('documentType', d.documentType);
+    form.append('title', d.title);
+    if (d.visitId) form.append('visitId', d.visitId);
+    return this.http.post<unknown>(`${USER_API}/documents`, form).pipe(map((r) => toDocument((unwrap(r) ?? {}) as Raw)), mapApiError());
+  }
+
+  /** V8. Detalle con la URL firmada (10 minutos) para abrir el archivo. */
+  document(documentId: string): Observable<DocumentEntry> {
+    return this.http.get<unknown>(`${USER_API}/documents/${documentId}`).pipe(map((r) => toDocument((unwrap(r) ?? {}) as Raw)), mapApiError());
+  }
+
+  /** V8. Solo la clínica que lo subió (`403` si no). */
+  deleteDocument(documentId: string): Observable<unknown> {
+    return this.http.delete<unknown>(`${USER_API}/documents/${documentId}`).pipe(mapApiError());
   }
 
   /** V4. Agrega un medicamento a un tratamiento. */

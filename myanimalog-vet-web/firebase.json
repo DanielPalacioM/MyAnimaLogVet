@@ -1,0 +1,8 @@
+{
+  "hosting": {
+    "site": "myanimalog-vet",
+    "public": "dist/myanimalog-vet-web/browser",
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "rewrites": [{ "source": "**", "destination": "/index.html" }]
+  }
+}

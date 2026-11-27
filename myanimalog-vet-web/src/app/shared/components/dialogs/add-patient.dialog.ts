@@ -9,7 +9,7 @@ import { Species } from '@services/clinic/clinic.models';
 import { ClinicStore } from '@services/clinic/clinic.store';
 import { inviteMessage, inviteUrl, mailtoUrl } from '@services/clinic/invite-link';
 import { FEATURE_MESSAGE, FEATURES } from '@services/features';
-import { phoneValidator } from '../../validators/common';
+import { documentNumberValidator, ownerFullNameValidator, ownerPhoneValidator } from '../../validators/common';
 import { VetField } from '../form-field/form-field.component';
 
 type Mode = 'menu' | 'link' | 'manual';
@@ -75,7 +75,15 @@ type Mode = 'menu' | 'link' | 'manual';
             <h3 class="part">El dueño</h3>
             <div class="grid">
               <vet-field label="Nombre completo" for="ap-owner" [control]="form.controls.ownerName"><input id="ap-owner" class="vet-input" formControlName="ownerName" autocomplete="off" /></vet-field>
-              <vet-field label="Teléfono (opcional)" for="ap-phone" [control]="form.controls.ownerPhone"><input id="ap-phone" class="vet-input" type="tel" formControlName="ownerPhone" placeholder="3001234567" /></vet-field>
+              <vet-field label="Teléfono (opcional)" for="ap-phone" [control]="form.controls.ownerPhone"><input id="ap-phone" class="vet-input" type="tel" formControlName="ownerPhone" placeholder="300 123 4567" autocomplete="off" /></vet-field>
+              <vet-field label="Tipo de documento" for="ap-doctype" [control]="form.controls.ownerDocumentType">
+                <select id="ap-doctype" class="vet-input" formControlName="ownerDocumentType">
+                  <option value="CC">Cédula de ciudadanía</option><option value="CE">Cédula de extranjería</option><option value="PPT">PPT</option>
+                </select>
+              </vet-field>
+              <vet-field label="Número de documento" for="ap-docnum" [control]="form.controls.ownerDocumentNumber">
+                <input id="ap-docnum" class="vet-input" inputmode="numeric" formControlName="ownerDocumentNumber" placeholder="1047123456" autocomplete="off" />
+              </vet-field>
               <vet-field class="wide" label="Correo" for="ap-oemail" [control]="form.controls.ownerEmail" hint="Aquí le llega la invitación para reclamar la mascota (vence en 30 días).">
                 <input id="ap-oemail" class="vet-input" type="email" formControlName="ownerEmail" placeholder="dueno@correo.com" autocomplete="off" />
               </vet-field>
@@ -138,9 +146,11 @@ export class AddPatientDialog {
     breed: ['', [Validators.required]],
     sex: [''],
     birthDate: [''],
-    ownerName: ['', [Validators.required, Validators.minLength(3)]],
-    ownerPhone: ['', [phoneValidator]],
+    ownerName: ['', [Validators.required, ownerFullNameValidator]],
+    ownerPhone: ['', [ownerPhoneValidator]],
     ownerEmail: ['', [Validators.required, Validators.email]],
+    ownerDocumentType: ['CC' as 'CC' | 'CE' | 'PPT', [Validators.required]],
+    ownerDocumentNumber: ['', [Validators.required, documentNumberValidator]],
   });
 
   protected copyCode(): void {
@@ -184,6 +194,8 @@ export class AddPatientDialog {
         ownerName: v.ownerName,
         ownerEmail: v.ownerEmail,
         ownerPhone: v.ownerPhone || undefined,
+        ownerDocumentType: v.ownerDocumentType,
+        ownerDocumentNumber: v.ownerDocumentNumber,
       })
       .subscribe({
         next: (res) => {

@@ -26,8 +26,12 @@ export interface ClinicService {
   online: boolean;
   /** Un servicio con citas no se borra: se desactiva. */
   active: boolean;
-  /** Quién lo presta. */
+  /** Quién lo presta, si el backend lo dice por persona (Calendar). Vacío = se deduce de `allowedRoles`. */
   professionalIds: string[];
+  /** Roles que pueden prestarlo (catálogo de Veterinary). */
+  allowedRoles?: MemberRole[];
+  /** Solo quien tiene tarjeta profesional verificada. */
+  requiresLicense?: boolean;
 }
 
 export interface Patient {
@@ -97,6 +101,8 @@ export interface NewPatient {
   /** Obligatorio: ahí llega la invitación para reclamar. */
   ownerEmail: string;
   ownerPhone?: string;
+  ownerDocumentType: 'CC' | 'CE' | 'PPT';
+  ownerDocumentNumber: string;
 }
 
 export interface Invitation {

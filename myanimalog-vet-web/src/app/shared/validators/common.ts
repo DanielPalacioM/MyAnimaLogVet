@@ -12,6 +12,33 @@ export const fullNameValidator: ValidatorFn = (control: AbstractControl): Valida
     : { fullName: { message: 'Escribe nombre y apellido completos.' } };
 };
 
+/**
+ * Nombre completo del dueño con las reglas del User service (FullNamePolicy, docs/NOMBRE_Y_TELEFONO.md):
+ * 2 a 100 caracteres; letras (con tildes y ñ), espacios, guion y apóstrofe. Se recorta y se colapsan espacios.
+ * Así el nombre que pone la clínica al "registrar sin app" es uno que el dueño también puede tener en su cuenta.
+ */
+export const ownerFullNameValidator: ValidatorFn = (control: AbstractControl): ValidationErrors | null => {
+  const value = String(control.value ?? '').trim().replace(/\s+/g, ' ');
+  if (!value) return null;
+  if (value.length < 2 || value.length > 100) return { fullName: { message: 'El nombre debe tener entre 2 y 100 caracteres.' } };
+  return /^[\p{L}\p{M}' -]+$/u.test(value)
+    ? null
+    : { fullName: { message: 'Usa solo letras, espacios, guion (-) o apóstrofe (\').' } };
+};
+
+/**
+ * Teléfono del dueño tal como lo escribe la persona: "3001234567", "300 123 4567" o "+57 300 123 4567".
+ * Se manda en E.164 (+57…), igual que lo guarda el User service.
+ */
+export const ownerPhoneValidator: ValidatorFn = (control: AbstractControl): ValidationErrors | null => {
+  const raw = String(control.value ?? '').trim();
+  if (!raw) return null;
+  const digits = raw.replace(/[\s().-]/g, '').replace(/^\+?57(?=\d{10}$)/, '');
+  return /^(3\d{9}|60\d{8})$/.test(digits)
+    ? null
+    : { phone: { message: 'Escribe un celular o fijo de 10 dígitos, por ejemplo 300 123 4567.' } };
+};
+
 /** Celular (3XXXXXXXXX) o fijo con indicativo (60XXXXXXXX): 10 dígitos. */
 export const phoneValidator: ValidatorFn = (control: AbstractControl): ValidationErrors | null => {
   const value = String(control.value ?? '');

@@ -33,7 +33,18 @@ export interface ScheduleBlockBody {
   reason: string;
 }
 
-/** Horario de la clínica y bloqueos (`/api/veterinary/{id}/business-hours` y `/schedule-blocks`, token de clínica). */
+/** Horario propio de un empleado (carpeta 17). `usesClinicHours`: sin filas propias, atiende en el horario de la clínica. */
+export interface EmployeeScheduleDto {
+  employeeId: string;
+  timezone?: string | null;
+  usesClinicHours: boolean;
+  items: BusinessHourDto[];
+}
+
+/** Máximo de días que acepta `GET /schedule-blocks` por consulta. */
+export const BLOCKS_MAX_DAYS = 92;
+
+/** Horario de la clínica, de cada empleado y bloqueos (Postman carpetas 16, 17 y 18; token de clínica). */
 @Injectable({ providedIn: 'root' })
 export class ScheduleApi {
   private readonly http = inject(HttpClient);
@@ -41,15 +52,31 @@ export class ScheduleApi {
 
   businessHours(veterinaryId: string): Observable<BusinessHourDto[]> {
     return this.http
-      .get<BusinessHourDto[] | { businessHours?: BusinessHourDto[]; hours?: BusinessHourDto[]; days?: BusinessHourDto[] }>(`${this.base(veterinaryId)}/business-hours`)
-      .pipe(map((res) => (Array.isArray(res) ? res : (res.businessHours ?? res.hours ?? res.days ?? []))), mapApiError());
+      .get<BusinessHourDto[] | { items?: BusinessHourDto[]; businessHours?: BusinessHourDto[] }>(`${this.base(veterinaryId)}/business-hours`)
+      .pipe(map((res) => (Array.isArray(res) ? res : (res.items ?? res.businessHours ?? []))), mapApiError());
   }
 
-  /** Reemplaza la semana completa (`CLINIC_CONFIGURE`). No se pueden solapar tramos del mismo día. */
-  replaceBusinessHours(veterinaryId: string, businessHours: { dayOfWeek: number; opensAt: string; closesAt: string }[]): Observable<unknown> {
-    return this.http.put(`${this.base(veterinaryId)}/business-hours`, { businessHours }).pipe(mapApiError());
+  /**
+   * Reemplaza la semana completa (`CLINIC_CONFIGURE`). El cuerpo es un **arreglo simple**; `[]` deja la clínica sin horario.
+   * `400 INVALID_BUSINESS_HOURS`: tramos solapados, más de 4 por día o `closesAt <= opensAt`.
+   */
+  replaceBusinessHours(veterinaryId: string, hours: { dayOfWeek: number; opensAt: string; closesAt: string }[]): Observable<unknown> {
+    return this.http.put(`${this.base(veterinaryId)}/business-hours`, hours).pipe(mapApiError());
   }
 
+  employeeSchedule(veterinaryId: string, employeeId: string): Observable<EmployeeScheduleDto> {
+    return this.http.get<EmployeeScheduleDto>(`${this.base(veterinaryId)}/employees/${employeeId}/schedule`).pipe(
+      map((r) => ({ employeeId: r?.employeeId ?? employeeId, timezone: r?.timezone ?? null, usesClinicHours: !!r?.usesClinicHours || !(r?.items ?? []).length, items: r?.items ?? [] })),
+      mapApiError(),
+    );
+  }
+
+  /** Arreglo simple; `[]` borra el horario propio y lo vuelve al de la clínica (no lo deja sin atender). */
+  replaceEmployeeSchedule(veterinaryId: string, employeeId: string, hours: { dayOfWeek: number; opensAt: string; closesAt: string }[]): Observable<unknown> {
+    return this.http.put(`${this.base(veterinaryId)}/employees/${employeeId}/schedule`, hours).pipe(mapApiError());
+  }
+
+  /** Un rango de máximo `BLOCKS_MAX_DAYS` días; devuelve los que se solapan con `[from, to)`. */
   blocks(veterinaryId: string, from: number, to: number): Observable<ScheduleBlockDto[]> {
     const params = new HttpParams().set('from', new Date(from).toISOString()).set('to', new Date(to).toISOString());
     return this.http

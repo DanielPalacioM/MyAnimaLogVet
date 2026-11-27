@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
-import { ClinicService, ServiceCategory } from '@services/clinic/clinic.models';
+import { ClinicService, MemberRole, ROLE_LABEL, ServiceCategory } from '@services/clinic/clinic.models';
 import { ClinicStore } from '@services/clinic/clinic.store';
 import { VetField } from '../form-field/form-field.component';
 import { VetModal } from '../modal/modal.component';
@@ -36,13 +36,17 @@ export type ServiceInput = Omit<ClinicService, 'id' | 'active'>;
         </vet-field>
         <fieldset>
           <legend>Quién lo presta</legend>
-          @for (p of store.professionals; track p.id) {
-            <label class="check"><input type="checkbox" [checked]="has(p.id)" (change)="toggle(p.id)" />{{ p.name }}</label>
+          @for (r of roles; track r) {
+            <label class="check"><input type="checkbox" [checked]="has(r)" (change)="toggle(r)" />{{ roleLabel[r] }}</label>
           }
-          @if (!form.controls.professionalIds.value.length && form.touched) {
-            <p class="error" role="alert">Elige al menos un profesional.</p>
+          @if (!form.controls.allowedRoles.value.length && form.touched) {
+            <p class="error" role="alert">Elige al menos un rol.</p>
           }
         </fieldset>
+        <div class="switch">
+          <span><strong>Requiere tarjeta profesional</strong><small>Solo lo atiende quien tenga la tarjeta verificada.</small></span>
+          <vet-switch [checked]="form.controls.requiresLicense.value" (checkedChange)="form.controls.requiresLicense.setValue($event)" label="Requiere tarjeta profesional" />
+        </div>
         <div class="switch">
           <span><strong>En línea</strong><small>Los dueños vinculados lo ven y piden cita desde la app.</small></span>
           <vet-switch [checked]="form.controls.online.value" (checkedChange)="form.controls.online.setValue($event)" label="Se puede pedir desde la app" />
@@ -77,6 +81,8 @@ export class ServiceDialog {
   protected readonly ref = inject<MatDialogRef<ServiceDialog, ServiceInput>>(MatDialogRef);
   protected readonly service = inject<ClinicService | null>(MAT_DIALOG_DATA, { optional: true });
   protected readonly categories = CATEGORIES;
+  protected readonly roles: MemberRole[] = ['OWNER', 'ADMIN', 'VET', 'ASSISTANT', 'RECEPTION'];
+  protected readonly roleLabel = ROLE_LABEL;
 
   protected readonly form = inject(FormBuilder).nonNullable.group({
     name: [this.service?.name ?? '', [Validators.required, Validators.minLength(2), (c: { value: string }) => this.taken(c.value)]],
@@ -84,7 +90,8 @@ export class ServiceDialog {
     minutes: [this.service?.minutes ?? this.store.profile()?.defaultMinutes ?? 30, [Validators.required, Validators.min(5), Validators.max(480)]],
     price: [this.service?.price ?? 0, [Validators.required, Validators.min(0)]],
     online: [this.service?.online ?? true],
-    professionalIds: [this.service?.professionalIds ?? (this.store.professionals[0] ? [this.store.professionals[0].id] : [])],
+    allowedRoles: [this.service?.allowedRoles?.length ? this.service.allowedRoles : (['OWNER', 'ADMIN', 'VET'] as MemberRole[])],
+    requiresLicense: [this.service?.requiresLicense ?? false],
   });
 
   private taken(name: string) {
@@ -92,20 +99,20 @@ export class ServiceDialog {
     return this.store.catalog().some((s) => s.id !== this.service?.id && s.name.toLowerCase() === n) ? { taken: true } : null;
   }
 
-  protected has(id: string): boolean {
-    return this.form.controls.professionalIds.value.includes(id);
+  protected has(role: MemberRole): boolean {
+    return this.form.controls.allowedRoles.value.includes(role);
   }
 
-  protected toggle(id: string): void {
-    const ids = this.form.controls.professionalIds.value;
-    this.form.controls.professionalIds.setValue(ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]);
+  protected toggle(role: MemberRole): void {
+    const roles = this.form.controls.allowedRoles.value;
+    this.form.controls.allowedRoles.setValue(roles.includes(role) ? roles.filter((x) => x !== role) : [...roles, role]);
     this.form.markAsTouched();
   }
 
   protected save(): void {
     this.form.markAllAsTouched();
-    if (this.form.invalid || !this.form.controls.professionalIds.value.length) return;
+    if (this.form.invalid || !this.form.controls.allowedRoles.value.length) return;
     const v = this.form.getRawValue();
-    this.ref.close({ name: v.name.trim(), category: v.category, minutes: Number(v.minutes), price: Number(v.price), online: v.online, professionalIds: v.professionalIds });
+    this.ref.close({ name: v.name.trim(), category: v.category, minutes: Number(v.minutes), price: Number(v.price), online: v.online, professionalIds: [], allowedRoles: v.allowedRoles, requiresLicense: v.requiresLicense });
   }
 }

@@ -41,6 +41,9 @@ const ROLE_TO_API: Record<Exclude<MemberRole, 'OWNER'>, InvitableRole> = {
 export const roleFromApi = (role: ClinicRole): MemberRole => ROLE_FROM_API[role] ?? 'ASSISTANT';
 export const roleToApi = (role: Exclude<MemberRole, 'OWNER'>): InvitableRole => ROLE_TO_API[role];
 
+/** Rol del panel → el del catálogo (`allowedRoles` sí admite `OWNER`). */
+export const serviceRoleToApi = (role: MemberRole): string => (role === 'OWNER' ? 'OWNER' : ROLE_TO_API[role]);
+
 /** Los roles que escriben historia clínica tienen tarjeta profesional; los demás "no aplica". */
 export const hasProfessionalProfile = (role: MemberRole): boolean => role === 'OWNER' || role === 'ADMIN' || role === 'VET';
 
@@ -110,17 +113,36 @@ export function profileFrom(dto: ClinicProfileDto): ClinicProfile {
 
 const initialsOf = (name: string) => name.split(' ').filter(Boolean).map((p) => p[0]).slice(0, 2).join('').toUpperCase();
 
-/** Cuerpo para registrar una mascota sin app (contrato propuesto, ver `LinkApi.registerPatient`). */
+/** Teléfono en E.164, como lo guarda el User service: "300 123 4567" y "+57 300…" pasan a +573001234567. */
+export const phoneOut = (raw: string | undefined): string | undefined => {
+  const digits = (raw ?? '').replace(/[^0-9]/g, '');
+  if (!digits) return undefined;
+  return digits.length === 10 ? `+57${digits}` : `+${digits}`;
+};
+
+/** Nombre completo como lo normaliza el User service: sin espacios de más. */
+export const fullNameOut = (raw: string): string => raw.trim().replace(/\s+/g, ' ');
+
+/** Cuerpo de `POST /{id}/patients/walk-in` (maestro §7.3). El correo es obligatorio: ahí llega la invitación para reclamar. */
 export function patientBodyFrom(input: NewPatient): NewPatientBody {
   const species = input.species === 'Perro' ? 'DOG' : input.species === 'Gato' ? 'CAT' : 'OTHER';
-  const phone = input.ownerPhone?.trim();
+  const phone = phoneOut(input.ownerPhone);
   return {
-    name: input.name.trim(),
-    species,
-    breed: input.breed.trim(),
-    ...(input.birthDate ? { birthDate: input.birthDate } : {}),
-    ...(input.sex ? { sex: input.sex === 'Macho' ? ('MALE' as const) : ('FEMALE' as const) } : {}),
-    owner: { fullName: input.ownerName.trim(), email: input.ownerEmail.trim().toLowerCase(), ...(phone ? { phone } : {}) },
+    pet: {
+      name: input.name.trim(),
+      species,
+      breed: input.breed.trim(),
+      ...(input.sex ? { sex: input.sex === 'Macho' ? ('MALE' as const) : ('FEMALE' as const) } : {}),
+      ...(input.birthDate ? { birthDate: input.birthDate } : {}),
+    },
+    owner: {
+      fullName: fullNameOut(input.ownerName),
+      email: input.ownerEmail.trim().toLowerCase(),
+      ...(phone ? { phone } : {}),
+      documentType: input.ownerDocumentType,
+      documentNumber: input.ownerDocumentNumber.trim(),
+    },
+    sendClaimInvitation: true,
   };
 }
 
@@ -162,21 +184,26 @@ export function withDetail(p: Patient, dto: PatientDto, now = Date.now()): Patie
 
 /** Mascota compartida → fila de Pacientes. Lo que el backend aún no da (visitas, vacunas) queda "Sin registro". */
 export function patientFrom(dto: PatientDto, ownerName: string): Patient {
+  // Sin dueño en la app (`ownerUserId` nulo o `UNCLAIMED`): la registró la clínica y el dueño aún no la reclama.
+  const status = String(dto.claimStatus ?? dto.claim?.status ?? '').toUpperCase();
+  const unclaimed = status === 'UNCLAIMED' || (!dto.ownerUserId && status !== 'CLAIMED');
+  const contact = dto.ownerContact;
+  const owner = unclaimed ? contact?.fullName?.trim() || dto.claim?.invitationEmail || contact?.email || ownerName : ownerName;
   return {
     id: dto.petId,
     name: dto.name,
     species: speciesFrom(dto.species),
     breed: dto.breed ?? '',
     age: ageFrom(dto.birthDate),
-    owner: ownerName,
-    ownerId: dto.ownerUserId,
+    owner,
+    ownerId: dto.ownerUserId ?? undefined,
     photoUrl: dto.photoUrl,
-    phone: '',
+    phone: contact?.phone ?? '',
     lastVisit: 'Sin visitas',
     lastVisitService: '—',
     lastVisitAt: 0,
     vaccines: 'NONE',
-    inApp: true,
+    inApp: !unclaimed,
   };
 }
 
@@ -231,6 +258,8 @@ export function serviceFrom(dto: ServiceDto): ClinicService {
     online: dto.bookableOnline ?? dto.bookable_online ?? false,
     active: dto.active ?? true,
     professionalIds: dto.employeeIds ?? dto.professionalIds ?? [],
+    ...(dto.allowedRoles?.length ? { allowedRoles: [...new Set(dto.allowedRoles.map((r) => roleFromApi(r as ClinicRole)))] } : {}),
+    requiresLicense: !!dto.requiresLicense,
   };
 }
 

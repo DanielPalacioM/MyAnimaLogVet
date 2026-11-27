@@ -1,7 +1,8 @@
 import { ChangeDetectionStrategy, Component, inject, OnInit } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { PAGE_SIZE, PatientSort, PatientsService, SpeciesTab } from '@services/patients/patients.service';
-import { Appointment, STATUS_LABEL } from '@services/clinic/clinic.models';
+import { errorMessage } from '@services/api-error';
+import { Appointment, Patient, STATUS_LABEL } from '@services/clinic/clinic.models';
 import { dayMonth, hourParts, longDate, sameDay } from '@services/clinic/date.utils';
 import { ClinicStore } from '@services/clinic/clinic.store';
 import { VACCINE } from '@services/clinic/patient-details';
@@ -106,15 +107,20 @@ export class PatientsPage implements OnInit {
     void this.router.navigate(['/pacientes', petId, 'historia'], { queryParams: newVisit ? { nueva: 'visita' } : {} });
   }
 
-  protected uploadDoc(): void {
-    this.actions.toast('Subir documentos estará disponible pronto');
+  /** Abre la historia en Documentos con el formulario de subir. */
+  protected uploadDoc(petId: string): void {
+    void this.router.navigate(['/pacientes', petId, 'historia'], { queryParams: { nueva: 'documento' } });
   }
 
   protected soon(): void {
     this.actions.toast('La historia completa estará disponible pronto');
   }
 
-  protected claimLink(owner: string): void {
-    this.actions.toast(`Enlace para reclamar enviado a ${owner}`);
+  /** "Reenviar invitación": el servidor cancela las pendientes y manda una nueva al correo que dejó la clínica (30 días). */
+  protected claimLink(p: Patient): void {
+    this.store.resendClaimInvitation(p.id).subscribe({
+      next: (email) => this.actions.toast(`Invitación enviada a ${email ?? p.owner}`),
+      error: (e: unknown) => this.actions.toast(errorMessage(e, 'No pudimos reenviar la invitación. Inténtalo de nuevo.')),
+    });
   }
 }

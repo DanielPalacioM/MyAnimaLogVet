@@ -212,7 +212,15 @@ export class NewAppointmentDialog {
   protected readonly professionals = computed(() => {
     const service = this.service();
     const all = this.store.professionals;
-    return service?.professionalIds.length ? all.filter((p) => service.professionalIds.includes(p.id)) : all;
+    if (service?.professionalIds.length) return all.filter((p) => service.professionalIds.includes(p.id));
+    // Catálogo de Veterinary: lo prestan los roles permitidos (y con tarjeta verificada si el servicio lo exige).
+    if (service?.allowedRoles?.length) {
+      const ok = new Set(
+        this.store.members().filter((m) => service.allowedRoles!.includes(m.role) && (!service.requiresLicense || m.license === 'VERIFIED')).map((m) => m.id),
+      );
+      return all.filter((p) => ok.has(p.id));
+    }
+    return all;
   });
   private readonly minutes = computed(() => this.service()?.minutes ?? this.reschedule?.minutes ?? 30);
   protected readonly whenLabel = computed(() => `${longDate(this.day())} · ${this.time() ? this.timeText(this.time()) : ''}`);

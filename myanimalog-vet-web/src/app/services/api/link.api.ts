@@ -28,28 +28,35 @@ export interface PatientDto {
   species: string | null;
   breed: string | null;
   photoUrl: string | null;
-  ownerUserId: string;
+  /** `null` mientras la mascota está sin reclamar. */
+  ownerUserId: string | null;
   grantedAt: string;
+  /** Mascota registrada por la clínica: `UNCLAIMED` hasta que el dueño la reclame. */
+  claimStatus?: string | null;
+  claim?: { status?: string | null; invitationEmail?: string | null; invitationSentAt?: string | null; invitationExpiresAt?: string | null } | null;
+  /** Contacto del dueño que dejó la clínica (solo mientras está sin reclamar). */
+  ownerContact?: { fullName?: string | null; email?: string | null; phone?: string | null } | null;
   /** Solo en el detalle. */
   sex?: string | null;
   birthDate?: string | null;
   weight?: number | null;
 }
 
-/** Cuerpo propuesto para registrar una mascota sin app. */
+/** Cuerpo de `POST /{id}/patients/walk-in`. */
 export interface NewPatientBody {
-  name: string;
-  species: 'DOG' | 'CAT' | 'OTHER';
-  breed: string;
-  /** `YYYY-MM-DD`. */
-  birthDate?: string;
-  sex?: 'MALE' | 'FEMALE';
-  owner: { fullName: string; email: string; phone?: string };
+  pet: { name: string; species: 'DOG' | 'CAT' | 'OTHER'; breed: string; sex?: 'MALE' | 'FEMALE'; /** `YYYY-MM-DD`. */ birthDate?: string };
+  owner: { fullName: string; email: string; phone?: string; documentType: 'CC' | 'CE' | 'PPT'; documentNumber: string };
+  /** Manda al correo del dueño la invitación para reclamar la mascota. */
+  sendClaimInvitation: boolean;
 }
 
+/** Respuesta de registrar sin app. No está documentada: se aceptan las formas probables. */
 export interface RegisteredPatientDto {
-  petId: string;
-  claimInvitation?: { email: string; expiresAt: string } | null;
+  petId?: string;
+  id?: string;
+  pet?: { id?: string; petId?: string } | null;
+  claimInvitation?: { email?: string | null; expiresAt?: string | null } | null;
+  invitationEmail?: string | null;
 }
 
 export interface UnlinkClientDto {
@@ -85,13 +92,17 @@ export class LinkApi {
   }
 
   /**
-   * Registrar una mascota **sin app** (la clínica la crea y manda una invitación al correo del dueño para reclamarla).
-   * ⚠ El backend aún no publica esta ruta (flag `patients` apagada): el contrato es una propuesta, ver `docs/ESTADO_RUTAS_Y_BRECHAS.md`.
-   * Se espera `201 { petId, claimInvitation: { email, expiresAt } }`; `409 OWNER_ALREADY_REGISTERED` si el correo ya tiene cuenta
-   * (entonces debe vincularse con el código).
+   * Registrar una mascota **sin app** (`POST /{id}/patients/walk-in`, contrato del maestro §7.3): la clínica la crea y, con
+   * `sendClaimInvitation`, el dueño recibe un correo para reclamarla (vence en 30 días; la clínica conserva el acceso).
+   * La respuesta se lee con tolerancia: `petId` (o `id`) y los datos de la invitación si vienen.
    */
   registerPatient(veterinaryId: string, body: NewPatientBody): Observable<RegisteredPatientDto> {
-    return this.http.post<RegisteredPatientDto>(`${VET_API}/${veterinaryId}/patients`, body).pipe(mapApiError());
+    return this.http.post<RegisteredPatientDto>(`${VET_API}/${veterinaryId}/patients/walk-in`, body).pipe(mapApiError());
+  }
+
+  /** "Reenviar invitación": cancela las pendientes y crea una nueva de 30 días. Solo si la mascota sigue sin reclamar. */
+  resendClaimInvitation(veterinaryId: string, petId: string): Observable<{ invitationEmail?: string | null; expiresAt?: string | null } | null> {
+    return this.http.post<{ invitationEmail?: string | null; expiresAt?: string | null } | null>(`${VET_API}/${veterinaryId}/patients/${petId}/claim-invitation`, {}).pipe(mapApiError());
   }
 
   patients(veterinaryId: string, page = 0, size = 100): Observable<PageDto<PatientDto>> {

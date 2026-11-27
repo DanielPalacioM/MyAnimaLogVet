@@ -40,6 +40,7 @@ const MESSAGES: Record<string, string> = {
   NO_ACTIVE_SUBSCRIPTION: 'La clínica no tiene un plan activo.',
   // Registro y verificación de la clínica
   INVALID_NIT: 'El NIT no es válido. Revisa el número y el dígito de verificación.',
+  INVALID_PHONE: 'El número de teléfono no es válido.',
   NIT_TAKEN: 'Ese NIT ya está registrado en otra clínica.',
   CONSENT_REQUIRED: 'Falta aceptar la política de datos y los términos.',
   CONSENT_VERSION_OUTDATED: 'Los términos cambiaron. Recarga la página y acéptalos de nuevo.',
